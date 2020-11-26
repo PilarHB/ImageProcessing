@@ -15,6 +15,11 @@ from skimage import feature
 
 class ImagePreprocessing():
 
+    # TODO: ELECCION DE PARAMETROS - PIPELINE (CONSTRUCTOR)
+    # defines the network
+    def __init__(self):
+        super(ImagePreprocessing, self).__init__()
+
     # BLURRING
     # type_blurring = ['averaging','gaussian','median','bilateral']
     def blurring(image, type_blurring, display):
@@ -56,6 +61,22 @@ class ImagePreprocessing():
         cv2.waitKey()
         cv2.destroyAllWindows()
         return new_image
+
+    # CLOSING
+    def closing(image):
+        closing = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+        return closing
+
+    # DILATION
+    def dilation(image, display):
+        kernel = np.ones((5, 5), np.uint8)
+        dilation = cv2.dilate(image, kernel, iterations=1)
+        if display:
+            # show the image
+            cv2.imshow("dilation", dilation)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        return dilation
 
     # EQUALIZATION - ADAPTIVE EQUALIZATION
     def adaptive_histogram_equalization(image, display):
@@ -110,6 +131,24 @@ class ImagePreprocessing():
             plt.show()
 
         return dst
+    #EROSION
+    def erosion(image, display):
+        kernel = np.ones((5, 5), np.uint8)
+        erosion = cv2.erode(image, kernel, iterations=1)
+
+        if display:
+            # show the image
+            cv2.imshow("erosion", erosion)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        return erosion
+
+    # OPENING
+    def opening(image):
+        kernel = np.ones((5, 5), np.uint8)
+        opening = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+        return opening
 
     # RESIZING
     def resize(image, heigth, display):
@@ -180,4 +219,24 @@ class ImagePreprocessing():
             plt.show()
 
         return adaptive_thresh
+
+    # TODO: PREPARAR UN METODO DE DATA AUGMENTATION
+
+    # ROTATE
+    def rotate(self, image, angle=90, scale=1.0):
+        '''
+        Rotate the image
+        :param image: image to be processed
+        :param angle: Rotation angle in degrees. Positive values mean counter-clockwise rotation (the coordinate origin is assumed to be the top-left corner).
+        :param scale: Isotropic scale factor.
+        '''
+        w = image.shape[1]
+        h = image.shape[0]
+        # rotate matrix
+        M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, scale)
+        # rotate
+        image = cv2.warpAffine(image, M, (w, h))
+        return image
+
+
 
