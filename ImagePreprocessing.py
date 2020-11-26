@@ -19,6 +19,8 @@ class ImagePreprocessing():
     # defines the network
     def __init__(self):
         super(ImagePreprocessing, self).__init__()
+        self.display = True
+
 
     # BLURRING
     # type_blurring = ['averaging','gaussian','median','bilateral']
