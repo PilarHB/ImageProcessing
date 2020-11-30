@@ -29,11 +29,13 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self):
         super(CNN, self).__init__()
+        # classes are two: success or failure
         num_target_classes = 2
+        # choose the model for the pretrained network
         self.feature_extractor = models.resnet50(pretrained=True)
         self.feature_extractor.eval()
 
-        # use the pretrained model to classify cifar-10 (10 image classes)
+        # use the pretrained model to classify success-fail (2 image classes)
         self.classifier = nn.Linear(2048, num_target_classes)
 
 
@@ -50,7 +52,7 @@ class CNN(pl.LightningModule):
         # self.fc1 = torch.nn.Linear(1960, 18)
         # self.dropout2 = torch.nn.Dropout(0.08)
         # self.fc2 = torch.nn.Linear(18, 10)
-        # # we are also defing some variable for counting purposes
+        # # we are also defining some variable for counting purposes
         # self.valTotal = 0
         # self.valCorrect = 0
         # self.trainTotal = 0
@@ -111,7 +113,7 @@ class CNN(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
-        loss = F.cross_entropy(y_hat, y)
+        loss = F.nll_loss(y_hat, y)
         self.log('val_loss', loss)
         pred = ...
         return {'loss': loss, 'pred': pred}
