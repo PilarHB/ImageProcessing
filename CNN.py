@@ -16,6 +16,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
+import torchvision.models as models
 from torch.utils.data import Dataset, DataLoader,random_split
 
 
@@ -28,50 +29,62 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self):
         super(CNN, self).__init__()
+        num_target_classes = 2
+        self.feature_extractor = models.resnet50(pretrained=True)
+        self.feature_extractor.eval()
+
+        # use the pretrained model to classify cifar-10 (10 image classes)
+        self.classifier = nn.Linear(2048, num_target_classes)
+
+
         # PyTorch uses NCHW
-        self.layer1 = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 28, kernel_size=5),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2))
-        self.layer2 = torch.nn.Sequential(
-            torch.nn.Conv2d(28, 10, kernel_size=3),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2))
-        self.dropout1 = torch.nn.Dropout(0.25)
-        self.fc1 = torch.nn.Linear(1960, 18)
-        self.dropout2 = torch.nn.Dropout(0.08)
-        self.fc2 = torch.nn.Linear(18, 10)
-        # we are also defing some variable for counting purposes
-        self.valTotal = 0
-        self.valCorrect = 0
-        self.trainTotal = 0
-        self.trainCorrect = 0
+        # self.layer1 = torch.nn.Sequential(
+        #     torch.nn.Conv2d(1, 28, kernel_size=5),
+        #     torch.nn.ReLU(),
+        #     torch.nn.MaxPool2d(kernel_size=2))
+        # self.layer2 = torch.nn.Sequential(
+        #     torch.nn.Conv2d(28, 10, kernel_size=3),
+        #     torch.nn.ReLU(),
+        #     torch.nn.MaxPool2d(kernel_size=2))
+        # self.dropout1 = torch.nn.Dropout(0.25)
+        # self.fc1 = torch.nn.Linear(1960, 18)
+        # self.dropout2 = torch.nn.Dropout(0.08)
+        # self.fc2 = torch.nn.Linear(18, 10)
+        # # we are also defing some variable for counting purposes
+        # self.valTotal = 0
+        # self.valCorrect = 0
+        # self.trainTotal = 0
+        # self.trainCorrect = 0
 
     # mandatory
     def forward(self, t):
         # evaluating the batch data as it moves forward in the netowrk
-        print("Beginning")
-        print(t.shape)
-        t = self.layer1(t)
-        print("After layer1")
-        print(t.shape)
-        t = self.layer2(t)
-        print("After layer2")
-        print(t.shape)
-        t = self.dropout1(t)
-        # t = torch.relu(self.fc1(t.view(t.size(0), -1)))
-        print(t.shape)
-        t = t.view(t.size(0), -1)
-        print("Before fc1")
-        print(t.shape)
-        t = self.fc1(t)
-        t = torch.relu(t)
-        t = F.leaky_relu(self.dropout2(t))
-
-        return F.softmax(self.fc2(t))
+        # print("Beginning")
+        # print(t.shape)
+        # t = self.layer1(t)
+        # print("After layer1")
+        # print(t.shape)
+        # t = self.layer2(t)
+        # print("After layer2")
+        # print(t.shape)
+        # t = self.dropout1(t)
+        # # t = torch.relu(self.fc1(t.view(t.size(0), -1)))
+        # print(t.shape)
+        # t = t.view(t.size(0), -1)
+        # print("Before fc1")
+        # print(t.shape)
+        # t = self.fc1(t)
+        # t = torch.relu(t)
+        # t = F.leaky_relu(self.dropout2(t))
+        #
+        # return F.softmax(self.fc2(t))
 
         # return t
         # return torch.relu(self.l1(x.view(x.size(0), -1)))
+        representations = self.feature_extractor(t)
+        t = self.classifier(representations)
+        return t
+
 
     # trainning loop
     def training_step(self, batch, batch_idx):
