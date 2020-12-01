@@ -20,6 +20,7 @@ import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
 from torch.utils.data import Dataset, DataLoader,random_split
+from pytorch_lightning import Trainer, seed_everything
 
 
 from sklearn.metrics import confusion_matrix
@@ -37,14 +38,17 @@ class CNN(pl.LightningModule):
         # classes are two: success or failure
         num_target_classes = 2
         # choose the model for the pretrained network
+        # self.feature_extractor = models.resnet18(pretrained=True)
+        # num_ftrs = self.feature_extractor.fc.in_features
+        # model_ft.fc = nn.Linear(num_ftrs, 2)
         self.feature_extractor = models.vgg16(pretrained=True)
         self.feature_extractor.eval()
 
         # use the pretrained model to classify success-fail (2 image classes)
-        print(self.feature_extractor.classifier[6].out_features)
+        # print(self.feature_extractor.classifier[6].out_features)
         # self.feature_extractor.classifier[6] = nn.Linear(in_features=self.feature_extractor.classifier[6].in_features, out_features=2)
         self.classifier = nn.Linear(self.feature_extractor.classifier[6].out_features, num_target_classes)
-
+        # self.classifier = nn.Linear(num_ftrs, num_target_classes)
     # mandatory
     def forward(self, t):
 
@@ -58,7 +62,7 @@ class CNN(pl.LightningModule):
         # x = x.view(x.size(0),-1)
         preds = self(imgs)
         # Calculate Loss
-        loss = F.nll_loss(preds, labels)
+        loss = F.cross_entropy(preds, labels)
         # Calculate Correct
         _, preds = torch.max(preds, 1)
         correct = torch.sum(preds == labels).float() / preds.size(0)
@@ -66,7 +70,7 @@ class CNN(pl.LightningModule):
         logs = {'train_loss': loss, 'train_correct': correct}
         # logs metrics for each training_step,
         # and the average across the epoch, to the progress bar and logger
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return {'loss': loss, 'log': logs, 'progress_bar': logs}
 
     # If you need to do something with all the outputs of each training_step
@@ -75,7 +79,8 @@ class CNN(pl.LightningModule):
 
     # define optimizers
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.02)
+        # return torch.optim.Adam(self.parameters(), lr=0.02)
+        return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
 
     # validation loop
     def validation_step(self, batch, batch_idx):
@@ -83,7 +88,8 @@ class CNN(pl.LightningModule):
         # x = x.view(x.size(0),-1)
         preds = self(imgs)
         # Calculate Loss
-        loss = F.nll_loss(preds, labels)
+        # loss = F.nll_loss(preds, labels)
+        loss = F.cross_entropy(preds, labels)
         # Calculate Correct
         _, preds = torch.max(preds, 1)
         correct = torch.sum(preds == labels).float() / preds.size(0)
@@ -100,7 +106,6 @@ class CNN(pl.LightningModule):
         avg_correct = torch.stack([x['val_correct'] for x in outputs]).mean()
         logs = {'avg_val_loss': avg_loss, 'avg_val_correct': avg_correct}
         torch.cuda.empty_cache()
-
         return {'avg_val_loss': avg_loss, 'log': logs}
 
 
@@ -166,7 +171,7 @@ if __name__ == '__main__':
 
     # Config  ################################################
     # criterion = nn.CrossEntropyLoss()
-    batch_size = 32
+    batch_size = 8
     # img_size = 224
     # epoch = 2
 
@@ -180,11 +185,14 @@ if __name__ == '__main__':
     # Load images  ################################################
     image_module = MyImageModule(batch_size=batch_size)
 
+    # Set a seed  ################################################
+    seed_everything(42)
+
     # Load model  ################################################
     model = CNN()
 
     # Trainer  ################################################
-    trainer = pl.Trainer(default_root_dir='./checkpoints')
+    trainer = pl.Trainer(default_root_dir='./checkpoints',gpus=1,deterministic=True)
     # trainer = pl.Trainer(default_root_dir='./checkpoints')
     trainer.fit(model, image_module)
 
