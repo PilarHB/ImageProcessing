@@ -24,34 +24,32 @@ from sklearn.metrics import confusion_matrix
 #from plotcm import plot_confusion_matrix
 import pdb
 
+#  --- Utility functions ---
+
+
+
 class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self):
         super(CNN, self).__init__()
         # classes are two: success or failure
+        # PyTorch uses NCHW
+        # classes are two: success or failure
         num_target_classes = 2
         # choose the model for the pretrained network
-        self.feature_extractor = models.resnet50(pretrained=True)
+        # self.feature_extractor = models.resnet18(pretrained=True)
+        # num_ftrs = self.feature_extractor.fc.in_features
+        # model_ft.fc = nn.Linear(num_ftrs, 2)
+        self.feature_extractor = models.vgg16(pretrained=True)
         self.feature_extractor.eval()
 
         # use the pretrained model to classify success-fail (2 image classes)
-        self.classifier = nn.Linear(2048, num_target_classes)
+        # print(self.feature_extractor.classifier[6].out_features)
+        # self.feature_extractor.classifier[6] = nn.Linear(in_features=self.feature_extractor.classifier[6].in_features, out_features=2)
+        self.classifier = nn.Linear(self.feature_extractor.classifier[6].out_features, num_target_classes)
+        # self.classifier = nn.Linear(num_ftrs, num_target_classes)
 
-
-        # PyTorch uses NCHW
-        # self.layer1 = torch.nn.Sequential(
-        #     torch.nn.Conv2d(1, 28, kernel_size=5),
-        #     torch.nn.ReLU(),
-        #     torch.nn.MaxPool2d(kernel_size=2))
-        # self.layer2 = torch.nn.Sequential(
-        #     torch.nn.Conv2d(28, 10, kernel_size=3),
-        #     torch.nn.ReLU(),
-        #     torch.nn.MaxPool2d(kernel_size=2))
-        # self.dropout1 = torch.nn.Dropout(0.25)
-        # self.fc1 = torch.nn.Linear(1960, 18)
-        # self.dropout2 = torch.nn.Dropout(0.08)
-        # self.fc2 = torch.nn.Linear(18, 10)
         # # we are also defining some variable for counting purposes
         # self.valTotal = 0
         # self.valCorrect = 0
@@ -60,29 +58,7 @@ class CNN(pl.LightningModule):
 
     # mandatory
     def forward(self, t):
-        # evaluating the batch data as it moves forward in the netowrk
-        # print("Beginning")
-        # print(t.shape)
-        # t = self.layer1(t)
-        # print("After layer1")
-        # print(t.shape)
-        # t = self.layer2(t)
-        # print("After layer2")
-        # print(t.shape)
-        # t = self.dropout1(t)
-        # # t = torch.relu(self.fc1(t.view(t.size(0), -1)))
-        # print(t.shape)
-        # t = t.view(t.size(0), -1)
-        # print("Before fc1")
-        # print(t.shape)
-        # t = self.fc1(t)
-        # t = torch.relu(t)
-        # t = F.leaky_relu(self.dropout2(t))
-        #
-        # return F.softmax(self.fc2(t))
 
-        # return t
-        # return torch.relu(self.l1(x.view(x.size(0), -1)))
         representations = self.feature_extractor(t)
         t = self.classifier(representations)
         return t
@@ -90,16 +66,20 @@ class CNN(pl.LightningModule):
 
     # trainning loop
     def training_step(self, batch, batch_idx):
-        x, y = batch
+        mgs, labels = batch
         # x = x.view(x.size(0),-1)
-        y_hat = self(x)
-        loss = F.nll_loss(y_hat, y)
+        preds = self(imgs)
+        # Calculate Loss
+        loss = F.cross_entropy(preds, labels)
+        # Calculate Correct
+        _, preds = torch.max(preds, 1)
+        correct = torch.sum(preds == labels).float() / preds.size(0)
 
+        logs = {'train_loss': loss, 'train_correct': correct}
         # logs metrics for each training_step,
         # and the average across the epoch, to the progress bar and logger
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-        return loss
+        # self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return {'loss': loss, 'log': logs, 'progress_bar': logs}
 
     # If you need to do something with all the outputs of each training_step
     # def training_epoch_end(self, training_step_outputs):
@@ -107,13 +87,31 @@ class CNN(pl.LightningModule):
 
     # define optimizers
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.02)
+        # return torch.optim.Adam(self.parameters(), lr=0.02)
+        return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
 
     # validation loop
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = F.nll_loss(y_hat, y)
-        self.log('val_loss', loss)
-        pred = ...
-        return {'loss': loss, 'pred': pred}
+        imgs, labels = batch
+        # x = x.view(x.size(0),-1)
+        preds = self(imgs)
+        # Calculate Loss
+        # loss = F.nll_loss(preds, labels)
+        loss = F.cross_entropy(preds, labels)
+        # Calculate Correct
+        _, preds = torch.max(preds, 1)
+        correct = torch.sum(preds == labels).float() / preds.size(0)
+
+        logs = {'train_loss': loss, 'train_correct': correct}
+        # logs metrics for each training_step,
+        # and the average across the epoch, to the progress bar and logger
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return {'loss': loss, 'log': logs, 'progress_bar': logs}
+
+    # Aggegate Validation Result
+    def validation_end(self, outputs):
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        avg_correct = torch.stack([x['val_correct'] for x in outputs]).mean()
+        logs = {'avg_val_loss': avg_loss, 'avg_val_correct': avg_correct}
+        torch.cuda.empty_cache()
+        return {'avg_val_loss': avg_loss, 'log': logs}
