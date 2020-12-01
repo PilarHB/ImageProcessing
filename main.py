@@ -25,6 +25,14 @@ if __name__ == '__main__':
     print(len(os.listdir('./images/training/fail')))
     print(len(os.listdir('./images/training/success')))
 
+    """Train the model.
+    Args:
+        args: Model hyper-parameters
+    Note:
+        For the sake of the example, the images dataset will be downloaded
+        to a temporary directory.
+    """
+
     # Config  ################################################
     # criterion = nn.CrossEntropyLoss()
     batch_size = 8
@@ -48,7 +56,7 @@ if __name__ == '__main__':
     model = CNN()
 
     # Trainer  ################################################
-    trainer = pl.Trainer(default_root_dir='./checkpoints',gpus=1,deterministic=True)
+    trainer = pl.Trainer(default_root_dir='./checkpoints', gpus=1, deterministic=True)
     # trainer = pl.Trainer(default_root_dir='./checkpoints')
     trainer.fit(model, image_module)
 
