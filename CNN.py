@@ -66,7 +66,7 @@ class CNN(pl.LightningModule):
 
     # trainning loop
     def training_step(self, batch, batch_idx):
-        mgs, labels = batch
+        imgs, labels = batch
         # x = x.view(x.size(0),-1)
         preds = self(imgs)
         # Calculate Loss
