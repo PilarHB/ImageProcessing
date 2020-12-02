@@ -33,6 +33,7 @@ class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self,
+                 input_shape: list = [3, 256, 256],
                  backbone: str = 'vgg16',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
@@ -42,6 +43,7 @@ class CNN(pl.LightningModule):
                  num_workers: int = 6):
         super(CNN, self).__init__()
         # parameters
+        self.dim = input_shape
         self.backbone = backbone
         self.train_bn = train_bn
         self.milestones = milestones
@@ -57,7 +59,13 @@ class CNN(pl.LightningModule):
 
         # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
+        # backbone = model_func(pretrained=True)
         self.feature_extractor = model_func(pretrained=True)
+        #_layers = list(backbone.children())[:-1]
+        #print(_layers)
+        # self.feature_extractor = torch.nn.Sequential(*_layers)
+
+        # freeze(module=self.feature_extractor, train_bn=self.train_bn)
 
         # 2. Classifier:
          #self.feature_extractor = models.vgg16(pretrained=True)
@@ -70,11 +78,9 @@ class CNN(pl.LightningModule):
         # PyTorch uses NCHW
         # classes are two: success or failure
         num_target_classes = 2
-        self.classifier = nn.Linear(self.feature_extractor.classifier[6].out_features, num_target_classes)
-
-        # use the pretrained model to classify success-fail (2 image classes)
+        n_sizes = self._get_conv_output(self.dim)
         # self.feature_extractor.classifier[6] = nn.Linear(in_features=self.feature_extractor.classifier[6].in_features, out_features=2)
-        # self.classifier = nn.Linear(num_ftrs, num_target_classes)
+        self.fc = nn.Linear(n_sizes, num_target_classes)
 
 
     # mandatory
@@ -87,9 +93,23 @@ class CNN(pl.LightningModule):
         t = t.squeeze(-1).squeeze(-1)
 
         # 2. Classifier (returns logits):
-        t = self.classifier(t)
+        t = self.fc(t)
 
         return t
+
+        # returns the size of the output tensor going into the Linear layer from the conv block.
+    def _get_conv_output(self, shape):
+        batch_size = 1
+        input = torch.autograd.Variable(torch.rand(batch_size, *shape))
+
+        output_feat = self._forward_features(input)
+        n_size = output_feat.data.view(batch_size, -1).size(1)
+        return n_size
+
+    # returns the feature tensor from the conv block
+    def _forward_features(self, x):
+        x = self.feature_extractor(x)
+        return x
 
     # loss function
     def loss(self, logits, labels):
