@@ -35,7 +35,11 @@ if __name__ == '__main__':
     # criterion = nn.CrossEntropyLoss()
     batch_size = 8
     # img_size = 224
-    # epoch = 2
+    # Number of epochs to train for
+    num_epochs = 15
+    # Flag for feature extracting. When False, we finetune the whole model,
+    #   when True we only update the reshaped layer params
+    feature_extract = True
 
     # Callbacks  ################################################
     # Save Model

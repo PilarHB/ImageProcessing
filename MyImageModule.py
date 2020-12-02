@@ -19,6 +19,7 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
+from cv2 import imwrite
 from torch.utils.data import Dataset, DataLoader,random_split
 from pytorch_lightning import Trainer, seed_everything
 
@@ -79,3 +80,34 @@ class MyImageModule(pl.LightningDataModule):
     def test_dataloader(self):
         test_loader = torch.utils.data.DataLoader(self.test_data, batch_size = self.batch_size)
         return test_loader
+
+def imshow(inp, title=None):
+    """Imshow for Tensor."""
+    inp = inp.numpy().transpose((1, 2, 0))
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp)
+    if title is not None:
+        plt.title(title)
+    plt.pause(0.001)  # pause a bit so that plots are updated
+
+def find_classes(dir):
+    classes = [d.name for d in os.scandir(dir) if d.is_dir()]
+    classes.sort()
+    class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+    return classes,
+
+if __name__ == '__main__':
+    batch_size = 8
+    image_module = MyImageModule(batch_size=batch_size)
+    image_module.setup()
+    # Get a batch of training data
+    inputs, classes = next(iter(image_module.train_dataloader()))
+    # Make a grid from batch
+    out = torchvision.utils.make_grid(inputs)
+    class_names = find_classes('./images/training/')
+    print(class_names)
+
+    imshow(out, title=[class_names[x] for x in classes])

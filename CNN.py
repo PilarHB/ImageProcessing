@@ -13,11 +13,13 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torch
 import torch.nn as nn
+from torch.nn import Module
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
+from typing import Optional
 from torch.utils.data import Dataset, DataLoader,random_split
 
 
@@ -25,9 +27,9 @@ from sklearn.metrics import confusion_matrix
 #from plotcm import plot_confusion_matrix
 import pdb
 
+BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
+
 #  --- Utility functions ---
-
-
 
 class CNN(pl.LightningModule):
 
@@ -61,8 +63,9 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         # backbone = model_func(pretrained=True)
         self.feature_extractor = model_func(pretrained=True)
-        #_layers = list(backbone.children())[:-1]
-        #print(_layers)
+
+        # _layers = list(self.feature_extractor.children())[:-1]
+        # print(_layers)
         # self.feature_extractor = torch.nn.Sequential(*_layers)
 
         # freeze(module=self.feature_extractor, train_bn=self.train_bn)
@@ -71,7 +74,6 @@ class CNN(pl.LightningModule):
          #self.feature_extractor = models.vgg16(pretrained=True)
         # self.feature_extractor = torch.nn.Sequential(*_layers)
         self.feature_extractor.eval()
-
         # 3. Loss:
         self.loss_func = F.binary_cross_entropy_with_logits
 
@@ -81,7 +83,6 @@ class CNN(pl.LightningModule):
         n_sizes = self._get_conv_output(self.dim)
         # self.feature_extractor.classifier[6] = nn.Linear(in_features=self.feature_extractor.classifier[6].in_features, out_features=2)
         self.fc = nn.Linear(n_sizes, num_target_classes)
-
 
     # mandatory
     def forward(self, t):
@@ -96,6 +97,11 @@ class CNN(pl.LightningModule):
         t = self.fc(t)
 
         return t
+
+    def set_parameter_requires_grad(model, feature_extracting):
+        if feature_extracting:
+            for param in model.parameters():
+                param.requires_grad = False
 
         # returns the size of the output tensor going into the Linear layer from the conv block.
     def _get_conv_output(self, shape):
@@ -170,8 +176,15 @@ class CNN(pl.LightningModule):
         # imgs = imgs.view(imgs.size(0),-1)
         preds = self(imgs)
 
+        # x, y = batch
+        # y_logits = self.forward(x)
+        # y_true = y.view((-1, 1)).type_as(x)
+        # y_bin = torch.ge(y_logits, 0)
+
         # Calculate Loss
         val_loss = F.cross_entropy(preds, labels)
+        # val_loss = self.loss(y_logits, y_true)
+        # num_correct = torch.eq(y_bin.view(-1), y_true.view(-1)).sum()
 
         # Calculate Correct
         _, preds = torch.max(preds, 1)
