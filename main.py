@@ -44,7 +44,7 @@ if __name__ == '__main__':
     # checkpoint_callback = ModelCheckpoint(filepath='./checkpoints', monitor='val_loss',
     #                                        save_best_only=True, mode='min', save_weights_only=True)
     # EarlyStopping
-    # earlystopping = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=2)
+    # earlystopping = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=2, verbose=False, mode='min')
 
     # Load images  ################################################
     image_module = MyImageModule(batch_size=batch_size)
