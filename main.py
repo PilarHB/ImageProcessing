@@ -21,9 +21,7 @@ if __name__ == '__main__':
         print('Memory Usage:')
         print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
         print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
-    print(len(os.listdir('./images/training/')))
-    print(len(os.listdir('./images/training/fail')))
-    print(len(os.listdir('./images/training/success')))
+
 
     """Train the model.
     Args:
@@ -48,6 +46,11 @@ if __name__ == '__main__':
 
     # Load images  ################################################
     image_module = MyImageModule(batch_size=batch_size)
+    image_module.setup()
+    # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+    val_samples = next(iter(image_module.val_dataloader()))
+    val_imgs, val_labels = val_samples[0], val_samples[1]
+    print(val_imgs.shape, val_labels.shape)
 
     # Set a seed  ################################################
     seed_everything(42)

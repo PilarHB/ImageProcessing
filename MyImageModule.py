@@ -38,7 +38,7 @@ class MyImageModule(pl.LightningDataModule):
     # self.val_data = datasets.ImageFolder(val_dir, transform=transform)
     # elf.test_data = datasets.ImageFolder(test_dir, transform=transform)
 
-    def setup(self, step):
+    def setup(self, step=None):
         self.transform = transforms.Compose([
             # you can add other transformations in this list
             # transforms.Grayscale(num_output_channels=1),
@@ -61,7 +61,6 @@ class MyImageModule(pl.LightningDataModule):
         dataset = datasets.ImageFolder(self.train_dir)
         #train_data = datasets.ImageFolder(self.train_dir, transform=transform)
         self.train_data, self.val_data, self.test_data = random_split(dataset, [150, 20, 21])
-
         # Data Augmentation for Training
         self.train_data.dataset.transform = self.augmentation
         # Transform Data
