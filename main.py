@@ -2,6 +2,8 @@
 
 import os
 import torch
+import numpy as np
+import re
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -22,8 +24,6 @@ def evaluate(model, loader):
         y_pred.extend(logits.detach().numpy())
 
     return np.array(y_true), np.array(y_pred)
-
-
 
 
 if __name__ == '__main__':
@@ -100,4 +100,19 @@ if __name__ == '__main__':
 
     # Test  ################################################
     trainer.test()
+
+    # Load best model  ################################################
+    model_ckpts = os.listdir(MODEL_CKPT_PATH)
+    losses = []
+    for model_ckpt in model_ckpts:
+        print(model_ckpt)
+        loss = re.findall("\d+\.\d+", model_ckpt)
+        losses.append(float(loss[0]))
+
+    losses = np.array(losses)
+    best_model_index = np.argsort(losses)[0]
+    best_model = model_ckpts[best_model_index]
+    print(best_model)
+
+
 

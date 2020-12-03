@@ -21,13 +21,13 @@ import pytorch_lightning as pl
 import torchvision.models as models
 from typing import Optional
 from torch.utils.data import Dataset, DataLoader,random_split
+from pytorch_lightning.metrics.functional import accuracy
 
 
 from sklearn.metrics import confusion_matrix
 #from plotcm import plot_confusion_matrix
 import pdb
 
-BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
 #  --- Utility functions ---
 
@@ -75,7 +75,7 @@ class CNN(pl.LightningModule):
         self.feature_extractor.eval()
 
         # 3. Loss:
-        self.loss_func = F.binary_cross_entropy_with_logits
+        # self.loss_func = F.cross_entropy
 
         # PyTorch uses NCHW
         # classes are two: success or failure
@@ -123,46 +123,27 @@ class CNN(pl.LightningModule):
 
     # trainning loop
     def training_step(self, batch, batch_idx):
-
-        imgs, labels = batch
-        # imgs = imgs.view(imgs.size(0), -1)
-        preds = self(imgs)
+        x, y = batch
+        logits = self(x)
 
         # 2. Compute loss & accuracy:
-        # Calculate Loss
-        train_loss = F.cross_entropy(preds, labels)
-        # Calculate Correct
-        _, preds = torch.max(preds, 1)
-        num_correct = torch.sum(preds == labels).float() / preds.size(0)
-
-        # logs = {'train_loss': train_loss, 'train_correct': num_correct}
-        # logs metrics for each training_step,
-        # and the average across the epoch, to the progress bar and logger
-        # self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        # return {'loss': train_loss, 'log': logs, 'progress_bar': logs}
+        train_loss = F.nll_loss(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
+        # num_correct = torch.eq(y_bin.view(-1), y_true.view(-1)).sum()
+        self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
 
         # 3. Outputs:
-        tqdm_dict = {'train_loss': train_loss}
-        output = OrderedDict({'loss': train_loss,
-                              'num_correct': num_correct,
-                              'log': tqdm_dict,
-                              'progress_bar': tqdm_dict})
-
-        return output
+        # tqdm_dict = {'train_loss': train_loss}
+        # output = OrderedDict({'loss': train_loss,
+        #                       # 'num_correct': num_correct,
+        #                       'log': tqdm_dict,
+        #                       'progress_bar': tqdm_dict})
+        # return output
+        return train_loss
 
     # If you need to do something with all the outputs of each training_step
-    def training_epoch_end(self, outputs):
-        """Compute and log training loss and accuracy at the epoch level."""
-
-        train_loss_mean = torch.stack([output['loss']
-                                       for output in outputs]).mean()
-        train_acc_mean = torch.stack([output['num_correct']
-                                      for output in outputs]).sum().float()
-        train_acc_mean /= (len(outputs) * self.batch_size)
-        return {'log': {'train_loss': train_loss_mean,
-                        'train_acc': train_acc_mean,
-                        'step': self.current_epoch}}
-
 
     # define optimizers
     def configure_optimizers(self):
@@ -171,56 +152,25 @@ class CNN(pl.LightningModule):
 
     # validation loop
     def validation_step(self, batch, batch_idx):
-        imgs, labels = batch
-        # imgs = imgs.view(imgs.size(0),-1)
-        preds = self(imgs)
-
-        # Calculate Loss
-        val_loss = F.cross_entropy(preds, labels)
-        # val_loss = self.loss(y_logits, y_true)
-        # num_correct = torch.eq(y_bin.view(-1), y_true.view(-1)).sum()
-
-        # Calculate Correct
-        _, preds = torch.max(preds, 1)
-        num_correct = torch.sum(preds == labels).float() / preds.size(0)
-
-        # logs = {'val_loss': val_loss, 'val_correct': num_correct}
-        # logs metrics for each training_step,
-        # and the average across the epoch, to the progress bar and logger
-        self.log('val_loss', val_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-        return {'val_loss': val_loss,'num_correct': num_correct}
-        # return {'loss': val_loss, 'log': logs, 'progress_bar': logs}
-
-    def validation_epoch_end(self, outputs):
-        """Compute and log validation loss and accuracy at the epoch level."""
-
-        val_loss_mean = torch.stack([output['val_loss']
-                                     for output in outputs]).mean()
-        val_acc_mean = torch.stack([output['num_correct']
-                                    for output in outputs]).sum().float()
-        val_acc_mean /= (len(outputs) * self.batch_size)
-        return {'log': {'val_loss': val_loss_mean,
-                        'val_acc': val_acc_mean,
-                        'step': self.current_epoch}}
-
-    def test_step(self, batch, batch_idx):
-        imgs, labels = batch
-        preds = self(imgs)
-
-        loss = F.nll_loss(logits, y)
+        x, y = batch
+        logits = self(x)
+        val_loss = F.nll_loss(logits, y)
 
         # validation metrics
         preds = torch.argmax(logits, dim=1)
         acc = accuracy(preds, y)
-        self.log('test_loss', loss, prog_bar=True)
-        self.log('test_acc', acc, prog_bar=True)
-        return loss
+        self.log('val_loss', val_loss, prog_bar=True)
+        self.log('val_acc', acc, prog_bar=True)
+        return val_loss
 
-    # # Aggegate Validation Result
-    # def validation_end(self, outputs):
-    #     avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-    #     avg_correct = torch.stack([x['val_correct'] for x in outputs]).mean()
-    #     logs = {'avg_val_loss': avg_loss, 'avg_val_correct': avg_correct}
-    #     torch.cuda.empty_cache()
-    #     return {'avg_val_loss': avg_loss, 'log': logs}
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        test_loss = F.nll_loss(logits, y)
+        # validation metrics
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
+        self.log('test_loss', test_loss, prog_bar=True)
+        self.log('test_acc', acc, prog_bar=True)
+        return test_loss
