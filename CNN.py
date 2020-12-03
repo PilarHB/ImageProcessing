@@ -40,7 +40,7 @@ class CNN(pl.LightningModule):
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  batch_size: int = 8,
-                 lr: float = 1e-2,
+                 learning_rate: float = 1e-2,
                  lr_scheduler_gamma: float = 1e-1,
                  num_workers: int = 6):
         super(CNN, self).__init__()
@@ -50,7 +50,7 @@ class CNN(pl.LightningModule):
         self.train_bn = train_bn
         self.milestones = milestones
         self.batch_size = batch_size
-        self.lr = lr
+        self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
 
@@ -75,7 +75,7 @@ class CNN(pl.LightningModule):
         self.feature_extractor.eval()
 
         # 3. Loss:
-        # self.loss_func = F.cross_entropy
+        self.loss_func = F.cross_entropy
 
         # PyTorch uses NCHW
         # classes are two: success or failure
@@ -123,54 +123,90 @@ class CNN(pl.LightningModule):
 
     # trainning loop
     def training_step(self, batch, batch_idx):
+        # x = images , y = batch, logits = labels
         x, y = batch
         logits = self(x)
+        #y_true = y.view((-1, 1)).type_as(x)
+        # y_bin = torch.ge(logits, 0)
 
         # 2. Compute loss & accuracy:
-        train_loss = F.nll_loss(logits, y)
+        train_loss = F.cross_entropy(logits, y)
+        # train_loss = self.loss(logits, y)
+        print(train_loss)
         preds = torch.argmax(logits, dim=1)
+        num_correct = torch.sum(preds == y).float() / preds.size(0)
         acc = accuracy(preds, y)
-        # num_correct = torch.eq(y_bin.view(-1), y_true.view(-1)).sum()
         self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
 
         # 3. Outputs:
-        # tqdm_dict = {'train_loss': train_loss}
-        # output = OrderedDict({'loss': train_loss,
-        #                       # 'num_correct': num_correct,
-        #                       'log': tqdm_dict,
-        #                       'progress_bar': tqdm_dict})
-        # return output
-        return train_loss
+        tqdm_dict = {'train_loss': train_loss}
+        output = OrderedDict({'loss': train_loss,
+                               'num_correct': num_correct,
+                               'log': tqdm_dict,
+                               'progress_bar': tqdm_dict})
+        return output
+        #return train_loss
+
+    def training_epoch_end(self, outputs):
+        """Compute and log training loss and accuracy at the epoch level."""
+
+        train_loss_mean = torch.stack([output['loss']
+                                       for output in outputs]).mean()
+        train_acc_mean = torch.stack([output['num_correct']
+                                      for output in outputs]).sum().float()
+        train_acc_mean /= (len(outputs) * self.batch_size)
+        return {'log': {'train_loss': train_loss_mean,
+                        'train_acc': train_acc_mean,
+                        'step': self.current_epoch}}
 
     # If you need to do something with all the outputs of each training_step
-
-    # define optimizers
-    def configure_optimizers(self):
-        # return torch.optim.Adam(self.parameters(), lr=0.02)
-        return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
 
     # validation loop
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
-        val_loss = F.nll_loss(logits, y)
 
-        # validation metrics
+        # 2. Compute loss & accuracy:
+        # val_loss = self.loss(logits, y)
+        val_loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
+        num_correct = torch.sum(preds == y).float() / preds.size(0)
         acc = accuracy(preds, y)
-        self.log('val_loss', val_loss, prog_bar=True)
-        self.log('val_acc', acc, prog_bar=True)
-        return val_loss
+        self.log('train_loss', val_loss, on_step=True, on_epoch=True, logger=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
 
+        return {'val_loss': val_loss,
+                'num_correct': num_correct}
+
+    def validation_epoch_end(self, outputs):
+        """Compute and log validation loss and accuracy at the epoch level."""
+
+        val_loss_mean = torch.stack([output['val_loss']
+                                     for output in outputs]).mean()
+        val_acc_mean = torch.stack([output['num_correct']
+                                    for output in outputs]).sum().float()
+        val_acc_mean /= (len(outputs) * self.batch_size)
+        return {'log': {'val_loss': val_loss_mean,
+                        'val_acc': val_acc_mean,
+                        'step': self.current_epoch}}
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
-        test_loss = F.nll_loss(logits, y)
-        # validation metrics
+        # 2. Compute loss & accuracy:
+        # test_loss = self.loss(logits, y)
+        test_loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
+        num_correct = torch.sum(preds == y).float() / preds.size(0)
         acc = accuracy(preds, y)
-        self.log('test_loss', test_loss, prog_bar=True)
-        self.log('test_acc', acc, prog_bar=True)
-        return test_loss
+        self.log('train_loss', test_loss, on_step=True, on_epoch=True, logger=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
+
+    # define optimizers
+    def configure_optimizers(self):
+        # return torch.optim.Adam(self.parameters(), lr=0.02)
+        # optimizer = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
+        return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
+        # return optimizer
