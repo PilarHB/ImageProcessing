@@ -4,11 +4,26 @@ import os
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from CNN import CNN
 from MyImageModule import MyImageModule
 
 torch.set_printoptions(linewidth=120)
+
+# --- FUNCTIONS ----
+def evaluate(model, loader):
+    y_true = []
+    y_pred = []
+    for imgs, labels in loader:
+        logits = inference_model(imgs)
+
+        y_true.extend(labels)
+        y_pred.extend(logits.detach().numpy())
+
+    return np.array(y_true), np.array(y_pred)
+
+
 
 
 if __name__ == '__main__':
@@ -42,11 +57,22 @@ if __name__ == '__main__':
     feature_extract = True
 
     # Callbacks  ################################################
-    # Save Model
-    # checkpoint_callback = ModelCheckpoint(filepath='./checkpoints', monitor='val_loss',
-    #                                        save_best_only=True, mode='min', save_weights_only=True)
-    # EarlyStopping
-    # earlystopping = EarlyStopping(monitor='val_loss', min_delta=0.0, patience=2, verbose=False, mode='min')
+    # Save the model after every epoch by monitoring a quantity.
+    MODEL_CKPT_PATH = 'model/'
+    MODEL_CKPT = 'model/model-{epoch:02d}-{val_loss:.2f}'
+    # Other options: save_top_k=3
+    checkpoint_callback = ModelCheckpoint(filepath=MODEL_CKPT,
+                                          monitor='val_loss',
+                                          save_top_k=3,
+                                          mode='min',
+                                          save_weights_only=True)
+    # EarlyStopping  ################################################
+    # Monitor a validation metric and stop training when it stops improving.
+    early_stop_callback = EarlyStopping(monitor='val_loss',
+                                  min_delta=0.0,
+                                  patience=2,
+                                  verbose=False,
+                                  mode='min')
 
     # Load images  ################################################
     image_module = MyImageModule(batch_size=batch_size)
@@ -63,13 +89,15 @@ if __name__ == '__main__':
     model = CNN()
 
     # Trainer  ################################################
-    trainer = pl.Trainer(default_root_dir='./checkpoints', gpus=1, deterministic=True)
-    # trainer = pl.Trainer(default_root_dir='./checkpoints')
+    trainer = pl.Trainer(max_epochs=num_epochs,
+                         default_root_dir='./checkpoints',
+                         gpus=1,
+                         deterministic=True,
+                         callbacks=[early_stop_callback],
+                         checkpoint_callback =checkpoint_callback)
+
     trainer.fit(model, image_module)
 
-    #Predict
-    # model = CNN.load_from_checkpoint(PATH)
-    # model.freeze()
+    # Test  ################################################
+    trainer.test()
 
-    # x = some_images_from_cifar10()
-    # predictions = model(x)

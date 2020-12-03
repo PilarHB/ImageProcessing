@@ -71,9 +71,9 @@ class CNN(pl.LightningModule):
         # freeze(module=self.feature_extractor, train_bn=self.train_bn)
 
         # 2. Classifier:
-         #self.feature_extractor = models.vgg16(pretrained=True)
-        # self.feature_extractor = torch.nn.Sequential(*_layers)
+        # If.eval() is used, then the layers are frozen.
         self.feature_extractor.eval()
+
         # 3. Loss:
         self.loss_func = F.binary_cross_entropy_with_logits
 
@@ -167,7 +167,6 @@ class CNN(pl.LightningModule):
     # define optimizers
     def configure_optimizers(self):
         # return torch.optim.Adam(self.parameters(), lr=0.02)
-
         return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
 
     # validation loop
@@ -175,11 +174,6 @@ class CNN(pl.LightningModule):
         imgs, labels = batch
         # imgs = imgs.view(imgs.size(0),-1)
         preds = self(imgs)
-
-        # x, y = batch
-        # y_logits = self.forward(x)
-        # y_true = y.view((-1, 1)).type_as(x)
-        # y_bin = torch.ge(y_logits, 0)
 
         # Calculate Loss
         val_loss = F.cross_entropy(preds, labels)
@@ -209,6 +203,19 @@ class CNN(pl.LightningModule):
         return {'log': {'val_loss': val_loss_mean,
                         'val_acc': val_acc_mean,
                         'step': self.current_epoch}}
+
+    def test_step(self, batch, batch_idx):
+        imgs, labels = batch
+        preds = self(imgs)
+
+        loss = F.nll_loss(logits, y)
+
+        # validation metrics
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
+        self.log('test_loss', loss, prog_bar=True)
+        self.log('test_acc', acc, prog_bar=True)
+        return loss
 
     # # Aggegate Validation Result
     # def validation_end(self, outputs):
