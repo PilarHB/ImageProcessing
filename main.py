@@ -7,6 +7,8 @@ import re
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from sklearn.metrics import precision_recall_curve
+from sklearn.preprocessing import label_binarize
 
 from CNN import CNN
 from MyImageModule import MyImageModule
@@ -105,14 +107,33 @@ if __name__ == '__main__':
     model_ckpts = os.listdir(MODEL_CKPT_PATH)
     losses = []
     for model_ckpt in model_ckpts:
-        print(model_ckpt)
+        # print(model_ckpt)
         loss = re.findall("\d+\.\d+", model_ckpt)
-        losses.append(float(loss[0]))
+        # print(loss)
+        if not loss:
+            losses = losses
+        else:
+            losses.append(float(loss[0]))
 
     losses = np.array(losses)
     best_model_index = np.argsort(losses)[0]
     best_model = model_ckpts[best_model_index]
     print(best_model)
+
+    inference_model = CNN.load_from_checkpoint(MODEL_CKPT_PATH + best_model)
+    y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
+    print("Y true:", y_true)
+    print("Y pred:", y_pred)
+
+    # generate binary correctness labels across classes
+    binary_ground_truth = label_binarize(y_true,
+                                         classes=np.arange(0, 1).tolist())
+
+    # compute a PR curve with sklearn like you normally would
+    precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(),
+                                                              y_pred.ravel())
+    print("Precision micro:", precision_micro)
+    print("Recall micro:", recall_micro)
 
 
 

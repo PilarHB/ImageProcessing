@@ -75,7 +75,7 @@ class CNN(pl.LightningModule):
         self.feature_extractor.eval()
 
         # 3. Loss:
-        self.loss_func = F.cross_entropy
+        # self.loss_func = F.cross_entropy
 
         # PyTorch uses NCHW
         # classes are two: success or failure
@@ -207,6 +207,6 @@ class CNN(pl.LightningModule):
     def configure_optimizers(self):
         # return torch.optim.Adam(self.parameters(), lr=0.02)
         # optimizer = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
-        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.001, momentum=0.9)
-        return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
+        return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
+        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
         # return optimizer
