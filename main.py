@@ -4,10 +4,11 @@ import os
 import torch
 import numpy as np
 import re
+import matplotlib.pyplot as plt
 import pytorch_lightning as pl
-from pytorch_lightning import seed_everything
+from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from sklearn.metrics import precision_recall_curve
+from pytorch_lightning.metrics.functional import precision_recall_curve
 from sklearn.preprocessing import label_binarize
 
 from CNN import CNN
@@ -128,12 +129,47 @@ if __name__ == '__main__':
     # generate binary correctness labels across classes
     binary_ground_truth = label_binarize(y_true,
                                          classes=np.arange(0, 1).tolist())
+    # print("binary_ground_truth", binary_ground_truth)
 
-    # compute a PR curve with sklearn like you normally would
-    precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(),
-                                                              y_pred.ravel())
-    print("Precision micro:", precision_micro)
-    print("Recall micro:", recall_micro)
+    # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
+    precision, recall, thresholds = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
+
+    print("Precision:", precision)
+    print("Recall:", recall)
+
+
+
+def plot_precision_recall_curve(recall, precision):
+
+    fig, ax = plt.subplots()
+    ax.step(recall, precision, color='r', alpha=0.99, where='post')
+    ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    fig.savefig("precision_recall_curve.png", format='png')
+
+def plot_roc_curve(y_true, y_pred):
+    # Compute ROC curve and ROC area for each class
+    test_y = y_true
+    y_pred = y_pred
+
+    fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score, pos_label=2)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic example')
+    plt.legend(loc="lower right")
+    plt.show()
 
 
 

@@ -29,9 +29,7 @@ class MyImageModule(pl.LightningDataModule):
         super().__init__()
         self.trains_dims = None
         self.batch_size = batch_size
-        self.train_dir = './images/training/'
-        self.test_dir = './images/test/'
-        self.data_dir = './images/training/'
+        self.data_dir = './images/'
 
     # def prepare_data(self):
 
@@ -59,9 +57,15 @@ class MyImageModule(pl.LightningDataModule):
         ])
 
         # Build Dataset
-        dataset = datasets.ImageFolder(self.train_dir)
+        dataset = datasets.ImageFolder(self.data_dir)
+        train_size = int(0.7 * len(dataset))
+        val_size = int(0.15 * (len(dataset) - train_size))
+        test_size = len(dataset) - train_size - val_size
         #train_data = datasets.ImageFolder(self.train_dir, transform=transform)
-        self.train_data, self.val_data, self.test_data = random_split(dataset, [150, 20, 21])
+        self.train_data, self.val_data, self.test_data = random_split(dataset, [train_size, val_size, test_size])
+        print("Len Train Data", len(self.train_data))
+        print("Len Val Data", len(self.val_data))
+        print("Len Test Data", len(self.test_data))
         # Data Augmentation for Training
         self.train_data.dataset.transform = self.augmentation
         # Transform Data
