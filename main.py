@@ -37,7 +37,7 @@ def plot_precision_recall_curve(recall, precision):
     plt.ylabel('Precision')
     plt.ylim([0.0, 1.05])
     plt.xlim([0.0, 1.0])
-    plt.legend(loc="lower right")
+    # plt.legend(loc="lower right")
     plt.title('Precision Recall Curve')
     fig.savefig("./stat_images/precision_recall_curve.png", format='png')
 
@@ -191,11 +191,12 @@ if __name__ == '__main__':
     # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
     precision, recall, thresholds = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
 
-    print("Precision:", precision)
-    print("Recall:", recall)
+    # print("Precision:", precision)
+    # print("Recall:", recall)
 
-    # Plot metrics  ################################################
+    # Plot metrics - Presion-Recall Curve
     plot_precision_recall_curve(recall, precision)
+    # Plot metrics - ROC Curve
     plot_roc_curve(y_true, y_pred)
 
 
