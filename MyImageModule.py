@@ -20,8 +20,9 @@ import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
 from cv2 import imwrite
-from torch.utils.data import Dataset, DataLoader,random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning import Trainer, seed_everything
+
 
 class MyImageModule(pl.LightningDataModule):
 
@@ -48,12 +49,12 @@ class MyImageModule(pl.LightningDataModule):
         ])
 
         self.augmentation = transforms.Compose([
-              transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
-              transforms.RandomRotation(degrees=15),
-              transforms.RandomHorizontalFlip(),
-              transforms.CenterCrop(size=224),
-              transforms.ToTensor(),
-              transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+            transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
+            transforms.RandomRotation(degrees=15),
+            transforms.RandomHorizontalFlip(),
+            transforms.CenterCrop(size=224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
         # Build Dataset
@@ -61,7 +62,7 @@ class MyImageModule(pl.LightningDataModule):
         train_size = int(0.7 * len(dataset))
         val_size = int(0.15 * (len(dataset) - train_size))
         test_size = len(dataset) - train_size - val_size
-        #train_data = datasets.ImageFolder(self.train_dir, transform=transform)
+        # train_data = datasets.ImageFolder(self.train_dir, transform=transform)
         self.train_data, self.val_data, self.test_data = random_split(dataset, [train_size, val_size, test_size])
         print("Len Train Data", len(self.train_data))
         print("Len Val Data", len(self.val_data))
@@ -72,7 +73,6 @@ class MyImageModule(pl.LightningDataModule):
         self.val_data.dataset.transform = self.transform
         self.test_data.dataset.transform = self.transform
 
-
     def train_dataloader(self):
         train_loader = torch.utils.data.DataLoader(self.train_data, batch_size=self.batch_size)
         return train_loader
@@ -82,8 +82,9 @@ class MyImageModule(pl.LightningDataModule):
         return val_loader
 
     def test_dataloader(self):
-        test_loader = torch.utils.data.DataLoader(self.test_data, batch_size = self.batch_size)
+        test_loader = torch.utils.data.DataLoader(self.test_data, batch_size=self.batch_size)
         return test_loader
+
 
 def imshow(inp, title=None):
     """Imshow for Tensor."""
@@ -97,11 +98,13 @@ def imshow(inp, title=None):
         plt.title(title)
     plt.pause(0.001)  # pause a bit so that plots are updated
 
+
 def find_classes(dir):
     classes = [d.name for d in os.scandir(dir) if d.is_dir()]
     classes.sort()
     class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
     return classes,
+
 
 if __name__ == '__main__':
     batch_size = 8

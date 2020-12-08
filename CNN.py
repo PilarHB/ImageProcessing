@@ -20,12 +20,11 @@ import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
 from typing import Optional
-from torch.utils.data import Dataset, DataLoader,random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning.metrics.functional import accuracy
 
-
 from sklearn.metrics import confusion_matrix
-#from plotcm import plot_confusion_matrix
+# from plotcm import plot_confusion_matrix
 import pdb
 
 
@@ -104,6 +103,7 @@ class CNN(pl.LightningModule):
                 param.requires_grad = False
 
         # returns the size of the output tensor going into the Linear layer from the conv block.
+
     def _get_conv_output(self, shape):
         batch_size = 1
         input = torch.autograd.Variable(torch.rand(batch_size, *shape))
@@ -126,27 +126,27 @@ class CNN(pl.LightningModule):
         # x = images , y = batch, logits = labels
         x, y = batch
         logits = self(x)
-        #y_true = y.view((-1, 1)).type_as(x)
-        # y_bin = torch.ge(logits, 0)
 
         # 2. Compute loss & accuracy:
         train_loss = F.cross_entropy(logits, y)
         # train_loss = self.loss(logits, y)
         print(train_loss)
         preds = torch.argmax(logits, dim=1)
-        num_correct = torch.sum(preds == y).float() / preds.size(0)
+        # num_correct = torch.sum(preds == y).float() / preds.size(0)
+        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
         self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
+        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         # 3. Outputs:
         tqdm_dict = {'train_loss': train_loss}
         output = OrderedDict({'loss': train_loss,
-                               'num_correct': num_correct,
-                               'log': tqdm_dict,
-                               'progress_bar': tqdm_dict})
+                              'num_correct': num_correct,
+                              'log': tqdm_dict,
+                              'progress_bar': tqdm_dict})
         return output
-        #return train_loss
+        # return train_loss
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
@@ -171,13 +171,16 @@ class CNN(pl.LightningModule):
         # val_loss = self.loss(logits, y)
         val_loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        num_correct = torch.sum(preds == y).float() / preds.size(0)
+        # num_correct = torch.sum(preds == y).float() / preds.size(0)
+        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
-        self.log('train_loss', val_loss, on_step=True, on_epoch=True, logger=True)
-        self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
+        self.log('val_loss', val_loss, on_step=True, on_epoch=True, logger=True)
+        self.log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
+        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         return {'val_loss': val_loss,
                 'num_correct': num_correct}
+
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
@@ -194,19 +197,29 @@ class CNN(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
+
         # 2. Compute loss & accuracy:
         # test_loss = self.loss(logits, y)
         test_loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        num_correct = torch.sum(preds == y).float() / preds.size(0)
+        # num_correct = torch.sum(preds == y).float() / preds.size(0)
+        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
+
         acc = accuracy(preds, y)
-        self.log('train_loss', test_loss, on_step=True, on_epoch=True, logger=True)
-        self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
+        self.log('test_loss', test_loss, on_step=True, on_epoch=True, logger=True)
+        self.log('test_acc', acc, on_step=True, on_epoch=True, logger=True)
+        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        return {'test_loss': test_loss,
+                'num_correct': num_correct}
 
     # define optimizers
     def configure_optimizers(self):
-        # return torch.optim.Adam(self.parameters(), lr=0.02)
-        # optimizer = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+
+        # optimizer1 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+        # optimizer2 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
         return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
         # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
-        # return optimizer
+        # return (
+        #        {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'},
+        #        {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+        # )

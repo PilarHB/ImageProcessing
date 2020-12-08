@@ -16,6 +16,7 @@ from MyImageModule import MyImageModule
 
 torch.set_printoptions(linewidth=120)
 
+
 # --- FUNCTIONS ----
 def evaluate(model, loader):
     y_true = []
@@ -28,8 +29,8 @@ def evaluate(model, loader):
 
     return np.array(y_true), np.array(y_pred)
 
-def plot_precision_recall_curve(recall, precision):
 
+def plot_precision_recall_curve(recall, precision):
     fig, ax = plt.subplots()
     ax.step(recall, precision, color='r', alpha=0.99, where='post')
     ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
@@ -40,6 +41,7 @@ def plot_precision_recall_curve(recall, precision):
     # plt.legend(loc="lower right")
     plt.title('Precision Recall Curve')
     fig.savefig("./stat_images/precision_recall_curve.png", format='png')
+
 
 def plot_roc_curve(y_true, y_pred):
     # Compute ROC curve and ROC area for each class
@@ -63,8 +65,8 @@ def plot_roc_curve(y_true, y_pred):
     plt.show()
     fig.savefig("./stat_images/ROC_curve.png", format='png')
 
-def load_best_model(MODEL_CKPT_PATH):
 
+def load_best_model(MODEL_CKPT_PATH):
     # Load best model  ################################################
     model_ckpts = os.listdir(MODEL_CKPT_PATH)
     losses = []
@@ -82,6 +84,7 @@ def load_best_model(MODEL_CKPT_PATH):
     best_model = model_ckpts[best_model_index]
     print(best_model)
     return best_model
+
 
 def config_parameter():
     # criterion = nn.CrossEntropyLoss()
@@ -105,6 +108,7 @@ def config_parameter():
                                         mode='min')
     return batch_size, num_epochs, checkpoint_callback, early_stop_callback
 
+
 # --- MAIN ----
 if __name__ == '__main__':
     print("Cuda:", torch.cuda.is_available())
@@ -116,8 +120,6 @@ if __name__ == '__main__':
         print('Memory Usage:')
         print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
         print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
-
-
 
     # Config  ################################################
     # criterion = nn.CrossEntropyLoss()
@@ -142,18 +144,18 @@ if __name__ == '__main__':
     # EarlyStopping  ################################################
     # Monitor a validation metric and stop training when it stops improving.
     early_stop_callback = EarlyStopping(monitor='val_loss',
-                                  min_delta=0.0,
-                                  patience=2,
-                                  verbose=False,
-                                  mode='min')
+                                        min_delta=0.0,
+                                        patience=2,
+                                        verbose=False,
+                                        mode='min')
 
     # Load images  ################################################
     image_module = MyImageModule(batch_size=batch_size)
     image_module.setup()
     # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-    val_samples = next(iter(image_module.val_dataloader()))
-    val_imgs, val_labels = val_samples[0], val_samples[1]
-    print(val_imgs.shape, val_labels.shape)
+    # val_samples = next(iter(image_module.val_dataloader()))
+    # val_imgs, val_labels = val_samples[0], val_samples[1]
+    # print(val_imgs.shape, val_labels.shape)
 
     # Set a seed  ################################################
     seed_everything(42)
@@ -167,7 +169,7 @@ if __name__ == '__main__':
                          gpus=1,
                          deterministic=True,
                          callbacks=[early_stop_callback],
-                         checkpoint_callback =checkpoint_callback)
+                         checkpoint_callback=checkpoint_callback)
 
     trainer.fit(model, image_module)
 
@@ -178,12 +180,11 @@ if __name__ == '__main__':
     best_model = load_best_model(MODEL_CKPT_PATH)
     print("Best model:", best_model)
 
+    # Evaluate model  ################################################
     inference_model = CNN.load_from_checkpoint(MODEL_CKPT_PATH + best_model)
     y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
-    print("Y true:", y_true)
-    print("Y pred:", y_pred)
 
-    # generate binary correctness labels across classes
+    # Generate binary correctness labels across classes
     binary_ground_truth = label_binarize(y_true,
                                          classes=np.arange(0, 1).tolist())
     # print("binary_ground_truth", binary_ground_truth)
@@ -194,12 +195,7 @@ if __name__ == '__main__':
     # print("Precision:", precision)
     # print("Recall:", recall)
 
-    # Plot metrics - Presion-Recall Curve
+    # Plot metrics - Precision-Recall Curve
     plot_precision_recall_curve(recall, precision)
     # Plot metrics - ROC Curve
-    plot_roc_curve(y_true, y_pred)
-
-
-
-
-
+    # plot_roc_curve(y_true, y_pred)
