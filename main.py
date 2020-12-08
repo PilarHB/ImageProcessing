@@ -22,7 +22,7 @@ def evaluate(model, loader):
     y_true = []
     y_pred = []
     for imgs, labels in loader:
-        logits = inference_model(imgs)
+        logits = model(imgs)
 
         y_true.extend(labels)
         y_pred.extend(logits.detach().numpy())
@@ -175,14 +175,15 @@ if __name__ == '__main__':
 
     # Test  ################################################
     trainer.test()
+    y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
-    best_model = load_best_model(MODEL_CKPT_PATH)
-    print("Best model:", best_model)
+    # best_model = load_best_model(MODEL_CKPT_PATH)
+    # print("Best model:", best_model)
 
     # Evaluate model  ################################################
-    inference_model = CNN.load_from_checkpoint(MODEL_CKPT_PATH + best_model)
-    y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
+    # inference_model = CNN.load_from_checkpoint(MODEL_CKPT_PATH + best_model)
+    # y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
 
     # Generate binary correctness labels across classes
     binary_ground_truth = label_binarize(y_true,

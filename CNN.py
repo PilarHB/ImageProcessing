@@ -20,6 +20,8 @@ import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
 from typing import Optional
+
+from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning.metrics.functional import accuracy
 
@@ -212,11 +214,12 @@ class CNN(pl.LightningModule):
     # define optimizers
     def configure_optimizers(self):
 
-        # optimizer1 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
-        # optimizer2 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
-        return torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
-        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
-        # return (
-        #        {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'},
-        #        {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
-        # )
+        # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+        optimizer1 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
+        # Decay LR by a factor of 0.1 every 7 epochs
+        scheduler1 = lr_scheduler.StepLR(optimizer2, step_size=7, gamma=0.1)
+        #return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
+        return (
+                {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
+                #{'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+         )
