@@ -87,14 +87,11 @@ class CNN(pl.LightningModule):
     def forward(self, t):
 
         """Forward pass. Returns logits."""
-
         # 1. Feature extraction:
         t = self.feature_extractor(t)
         t = t.squeeze(-1).squeeze(-1)
-
         # 2. Classifier (returns logits):
         t = self.fc(t)
-
         return t
 
     def set_parameter_requires_grad(model, feature_extracting):
