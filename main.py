@@ -16,98 +16,108 @@ from MyImageModule import MyImageModule
 
 torch.set_printoptions(linewidth=120)
 
+class ImageModel():
+    def __init__(self,
+                 batch_size=8,
+                 num_epochs=15,
+                 img_size=256,
+                 feature_extract=True):
+        # Parameters
+        self.batch_size = batch_size
+        self.num_epochs = num_epochs
+        self.img_size = img_size
+        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped layer params
+        self.feature_extract = feature_extract
+        # criterion = nn.CrossEntropyLoss()
 
-# --- FUNCTIONS ----
-def evaluate(model, loader):
-    y_true = []
-    y_pred = []
-    for imgs, labels in loader:
-        logits = model(imgs)
-
-        y_true.extend(labels)
-        y_pred.extend(logits.detach().numpy())
-
-    return np.array(y_true), np.array(y_pred)
-
-
-def plot_precision_recall_curve(recall, precision):
-    fig, ax = plt.subplots()
-    ax.step(recall, precision, color='r', alpha=0.99, where='post')
-    ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.ylim([0.0, 1.05])
-    plt.xlim([0.0, 1.0])
-    # plt.legend(loc="lower right")
-    plt.title('Precision Recall Curve')
-    fig.savefig("./stat_images/precision_recall_curve.png", format='png')
+    def config_callbacks():
 
 
-def plot_roc_curve(y_true, y_pred):
-    # Compute ROC curve and ROC area for each class
-    y_test = y_true
-    y_score = y_pred
-
-    fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score, pos_label=2)
-    roc_auc = auc(fpr, tpr)
-
-    fig, ax = plt.figure()
-    lw = 2
-    plt.plot(fpr, tpr, color='darkorange',
-             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic example')
-    plt.legend(loc="lower right")
-    plt.show()
-    fig.savefig("./stat_images/ROC_curve.png", format='png')
 
 
-def load_best_model(MODEL_CKPT_PATH):
-    # Load best model  ################################################
-    model_ckpts = os.listdir(MODEL_CKPT_PATH)
-    losses = []
-    for model_ckpt in model_ckpts:
-        # print(model_ckpt)
-        loss = re.findall("\d+\.\d+", model_ckpt)
-        # print(loss)
-        if not loss:
-            losses = losses
-        else:
-            losses.append(float(loss[0]))
+        checkpoint_callback = ModelCheckpoint(filepath=MODEL_CKPT,
+                                              monitor='val_loss',
+                                              save_top_k=3,
+                                              mode='min',
+                                              save_weights_only=True)
+        # EarlyStopping  ################################################
+        # Monitor a validation metric and stop training when it stops improving.
+        early_stop_callback = EarlyStopping(monitor='val_loss',
+                                            min_delta=0.0,
+                                            patience=2,
+                                            verbose=False,
+                                            mode='min')
+        return checkpoint_callback, early_stop_callback
 
-    losses = np.array(losses)
-    best_model_index = np.argsort(losses)[0]
-    best_model = model_ckpts[best_model_index]
-    print(best_model)
-    return best_model
+    # def evaluate(self):
+    #     return features, feature_size
 
+    def evaluate(model, loader):
+        y_true = []
+        y_pred = []
+        for imgs, labels in loader:
+            logits = model(imgs)
 
-def config_parameter():
-    # criterion = nn.CrossEntropyLoss()
-    batch_size = 8
-    # img_size = 224
-    # Number of epochs to train for
-    num_epochs = 15
-    # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped layer params
-    # feature_extract = True
-    checkpoint_callback = ModelCheckpoint(filepath=MODEL_CKPT,
-                                          monitor='val_loss',
-                                          save_top_k=3,
-                                          mode='min',
-                                          save_weights_only=True)
-    # EarlyStopping  ################################################
-    # Monitor a validation metric and stop training when it stops improving.
-    early_stop_callback = EarlyStopping(monitor='val_loss',
-                                        min_delta=0.0,
-                                        patience=2,
-                                        verbose=False,
-                                        mode='min')
-    return batch_size, num_epochs, checkpoint_callback, early_stop_callback
+            y_true.extend(labels)
+            y_pred.extend(logits.detach().numpy())
 
+        return np.array(y_true), np.array(y_pred)
+
+    def load_model(self):
+        return model
+
+    def load_best_model(MODEL_CKPT_PATH):
+        # Load best model  ################################################
+        model_ckpts = os.listdir(MODEL_CKPT_PATH)
+        losses = []
+        for model_ckpt in model_ckpts:
+            # print(model_ckpt)
+            loss = re.findall("\d+\.\d+", model_ckpt)
+            # print(loss)
+            if not loss:
+                losses = losses
+            else:
+                losses.append(float(loss[0]))
+
+        losses = np.array(losses)
+        best_model_index = np.argsort(losses)[0]
+        best_model = model_ckpts[best_model_index]
+        print(best_model)
+        return best_model
+
+    def plot_precision_recall_curve(recall, precision):
+        fig, ax = plt.subplots()
+        ax.step(recall, precision, color='r', alpha=0.99, where='post')
+        ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.ylim([0.0, 1.05])
+        plt.xlim([0.0, 1.0])
+        # plt.legend(loc="lower right")
+        plt.title('Precision Recall Curve')
+        fig.savefig("./stat_images/precision_recall_curve.png", format='png')
+
+    def plot_roc_curve(y_true, y_pred):
+        # Compute ROC curve and ROC area for each class
+        y_test = y_true
+        y_score = y_pred
+
+        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score, pos_label=2)
+        roc_auc = auc(fpr, tpr)
+
+        fig, ax = plt.figure()
+        lw = 2
+        plt.plot(fpr, tpr, color='darkorange',
+                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic example')
+        plt.legend(loc="lower right")
+        plt.show()
+        fig.savefig("./stat_images/ROC_curve.png", format='png')
 
 # --- MAIN ----
 if __name__ == '__main__':

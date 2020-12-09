@@ -65,11 +65,9 @@ class CNN(pl.LightningModule):
         # backbone = model_func(pretrained=True)
         self.feature_extractor = model_func(pretrained=True)
 
-        # _layers = list(self.feature_extractor.children())[:-1]
-        # print(_layers)
+        _layers = list(self.feature_extractor.children())[:-1]
+        print(_layers)
         # self.feature_extractor = torch.nn.Sequential(*_layers)
-
-        # freeze(module=self.feature_extractor, train_bn=self.train_bn)
 
         # 2. Classifier:
         # If.eval() is used, then the layers are frozen.
@@ -123,8 +121,6 @@ class CNN(pl.LightningModule):
         output_feat = self._forward_features(input)
         print("output_feat")
         print(output_feat)
-        print("output_feat.data.view(batch_size, -1)")
-        print(output_feat.data.view(batch_size, -1))
         n_size = output_feat.data.view(batch_size, -1).size(1)
         print("n_size")
         print(n_size)
