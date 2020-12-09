@@ -6,6 +6,7 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
+import torchvision.transforms.functional as F
 from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.metrics.functional import precision_recall_curve, auc
@@ -17,6 +18,7 @@ from CNN import CNN
 from MyImageModule import MyImageModule
 
 torch.set_printoptions(linewidth=120)
+
 
 class ImageModel():
     def __init__(self,
@@ -40,6 +42,7 @@ class ImageModel():
         self.model = CNN()
         self.image_module = MyImageModule(batch_size=self.batch_size)
         self.image_module.setup()
+        self.activation = {}
 
     def call_trainer(self):
         # Load images  ################################################
@@ -60,7 +63,6 @@ class ImageModel():
         trainer.fit(self.model, self.image_module)
         # Test  ################################################
         trainer.test()
-
 
     def config_callbacks(self):
         # Checkpoint  ################################################
@@ -90,6 +92,23 @@ class ImageModel():
 
         return np.array(y_true), np.array(y_pred)
 
+    def get_activation(self, name):
+        def hook(model, input, output):
+            self.activation[name] = output.detach()
+
+        return hook
+
+    def evaluate_image(self, image, model):
+        image_tensor = self.image_preprocessing(image)
+        model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
+        output = model(image_tensor)
+        # print("Features", self.activation['classifier[6]'])
+        # print("Output", output[0])
+        features = output[0]
+        features_size = output[0].shape
+        print("features size", features_size)
+        return features, features_size
+
     def image_preprocessing(self, image):
         transform = transforms.Compose([
             # you can add other transformations in this list
@@ -99,9 +118,9 @@ class ImageModel():
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        image = Image.open(image).convert('RGB')
-        image = transform(image).unsqueeze(0)
-        return image
+        image_tensor = transform(image).unsqueeze(0)
+        print(image_tensor.shape)
+        return image_tensor
 
     def inference_model(self):
         best_model = self.load_best_model()
@@ -133,7 +152,7 @@ class ImageModel():
         best_model = model_ckpts[best_model_index]
         return best_model
 
-    def plot_precision_recall_curve(recall, precision):
+    def plot_precision_recall_curve(self, recall, precision):
         fig, ax = plt.subplots()
         ax.step(recall, precision, color='r', alpha=0.99, where='post')
         ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
@@ -145,7 +164,7 @@ class ImageModel():
         plt.title('Precision Recall Curve')
         fig.savefig("./stat_images/precision_recall_curve.png", format='png')
 
-    def plot_roc_curve(y_true, y_pred):
+    def plot_roc_curve(self, y_true, y_pred):
         # Compute ROC curve and ROC area for each class
         y_test = y_true
         y_score = y_pred
@@ -167,6 +186,7 @@ class ImageModel():
         plt.show()
         fig.savefig("./stat_images/ROC_curve.png", format='png')
 
+
 # --- MAIN ----
 if __name__ == '__main__':
     print("Cuda:", torch.cuda.is_available())
@@ -175,43 +195,42 @@ if __name__ == '__main__':
     # print("Cuda:", torch.cuda.get_device_name(0))
     if dev.type == 'cuda':
         print(torch.cuda.get_device_name(0))
-        print('Memory Usage:')
-        print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-        print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+        # print('Memory Usage:')
+        # print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+        # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
     image_model = ImageModel()
     checkpoint_callback, early_stop_callback = image_model.config_callbacks()
-
-    # Load images  ################################################
-    # image_module = MyImageModule(batch_size=batch_size)
-    # image_module.setup()
-
 
     # Train model  ################################################
     # image_model.call_trainner()
     # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
-    # best_model = image_model.load_best_model()
-    # print("Best model:", best_model)
+    best_model = image_model.load_best_model()
+    print("Best model:", best_model)
+    inference_model = image_model.inference_model()
+    print(inference_model)
+
+    #  Evaluate output  ################################################
+    image = Image.open("./images/fail/img1605601451.8657722.png")
+    # image_tensor = image_model.image_preprocessing(image)
+    image_model.evaluate_image(image, inference_model)
 
     # Evaluate model  ################################################
     # inference_model = image_model.inference_model()
-    y_true, y_pred = image_model.evaluate_model()
+    # y_true, y_pred = image_model.evaluate_model()
 
     # Generate binary correctness labels across classes
     # binary_ground_truth = label_binarize(y_true,
-    #                                      classes=np.arange(0, 1).tolist())
+    #                                     classes=np.arange(0, 1).tolist())
     # print("binary_ground_truth", binary_ground_truth)
 
     # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
-    # precision, recall, thresholds = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
-
-    # print("Precision:", precision)
-    # print("Recall:", recall)
+    # precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
 
     # Plot metrics - Precision-Recall Curve
-    # plot_precision_recall_curve(recall, precision)
+    # image_model.plot_precision_recall_curve(recall, precision)
     # Plot metrics - ROC Curve
     # plot_roc_curve(y_true, y_pred)
