@@ -101,14 +101,33 @@ class CNN(pl.LightningModule):
             for param in model.parameters():
                 param.requires_grad = False
 
-        # returns the size of the output tensor going into the Linear layer from the conv block.
+        ## for name, child in res_mod.named_children():
+        ##    if name in ['layer3', 'layer4']:
+        ##        print(name + 'has been unfrozen.')
+        ##        for param in child.parameters():
+        ##            param.requires_grad = True
+        ##    else:
+        ##        for param in child.parameters():
+        ##            param.requires_grad = False
 
+        # also need to update optimization function
+        # only optimize those that require grad
+
+        ## optimizer_conv = torch.optim.SGD(filter(lambda x: x.requires_grad, res_mod.parameters()), lr=0.001, momentum=0.9)
+
+    # returns the size of the output tensor going into the Linear layer from the conv block.
     def _get_conv_output(self, shape):
         batch_size = 1
         input = torch.autograd.Variable(torch.rand(batch_size, *shape))
 
         output_feat = self._forward_features(input)
+        print("output_feat")
+        print(output_feat)
+        print("output_feat.data.view(batch_size, -1)")
+        print(output_feat.data.view(batch_size, -1))
         n_size = output_feat.data.view(batch_size, -1).size(1)
+        print("n_size")
+        print(n_size)
         return n_size
 
     # returns the feature tensor from the conv block
@@ -217,9 +236,10 @@ class CNN(pl.LightningModule):
         # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
         optimizer1 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
         # Decay LR by a factor of 0.1 every 7 epochs
-        scheduler1 = lr_scheduler.StepLR(optimizer2, step_size=7, gamma=0.1)
-        #return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
+        scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
+        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
         return (
-                {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
-                #{'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+                # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
+                {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
+                # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
          )

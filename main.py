@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     # Test  ################################################
     trainer.test()
-    y_true, y_pred = evaluate(model, image_module.test_dataloader())
+    # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
     # best_model = load_best_model(MODEL_CKPT_PATH)
@@ -186,17 +186,17 @@ if __name__ == '__main__':
     # y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
 
     # Generate binary correctness labels across classes
-    binary_ground_truth = label_binarize(y_true,
-                                         classes=np.arange(0, 1).tolist())
+    # binary_ground_truth = label_binarize(y_true,
+    #                                      classes=np.arange(0, 1).tolist())
     # print("binary_ground_truth", binary_ground_truth)
 
     # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
-    precision, recall, thresholds = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
+    # precision, recall, thresholds = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
 
     # print("Precision:", precision)
     # print("Recall:", recall)
 
     # Plot metrics - Precision-Recall Curve
-    plot_precision_recall_curve(recall, precision)
+    # plot_precision_recall_curve(recall, precision)
     # Plot metrics - ROC Curve
     # plot_roc_curve(y_true, y_pred)
