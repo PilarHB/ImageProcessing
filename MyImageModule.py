@@ -19,7 +19,6 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
-from cv2 import imwrite
 from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning import Trainer, seed_everything
 

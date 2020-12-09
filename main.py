@@ -10,6 +10,8 @@ from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.metrics.functional import precision_recall_curve, auc
 from sklearn.preprocessing import label_binarize
+from PIL import Image
+from torchvision import transforms
 
 from CNN import CNN
 from MyImageModule import MyImageModule
@@ -29,13 +31,41 @@ class ImageModel():
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped layer params
         self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
+        # Save the model after every epoch by monitoring a quantity.
+        self.MODEL_CKPT_PATH = 'model/'
+        self.MODEL_CKPT = 'model/model-{epoch:02d}-{val_loss:.2f}'
+        # Set a seed  ################################################
+        seed_everything(42)
+        # Load model  ################################################
+        self.model = CNN()
+        self.image_module = MyImageModule(batch_size=self.batch_size)
+        self.image_module.setup()
 
-    def config_callbacks():
+    def call_trainer(self):
+        # Load images  ################################################
+
+        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        # val_samples = next(iter(image_module.val_dataloader()))
+        # val_imgs, val_labels = val_samples[0], val_samples[1]
+        # print(val_imgs.shape, val_labels.shape)
+
+        # Trainer  ################################################
+        trainer = pl.Trainer(max_epochs=self.num_epochs,
+                             default_root_dir='./checkpoints',
+                             gpus=1,
+                             deterministic=True,
+                             callbacks=[early_stop_callback],
+                             checkpoint_callback=checkpoint_callback)
+
+        trainer.fit(self.model, self.image_module)
+        # Test  ################################################
+        trainer.test()
 
 
-
-
-        checkpoint_callback = ModelCheckpoint(filepath=MODEL_CKPT,
+    def config_callbacks(self):
+        # Checkpoint  ################################################
+        # Saves the models so it is possible to access afterwards
+        checkpoint_callback = ModelCheckpoint(filepath=self.MODEL_CKPT,
                                               monitor='val_loss',
                                               save_top_k=3,
                                               mode='min',
@@ -49,10 +79,7 @@ class ImageModel():
                                             mode='min')
         return checkpoint_callback, early_stop_callback
 
-    # def evaluate(self):
-    #     return features, feature_size
-
-    def evaluate(model, loader):
+    def evaluate(self, model, loader):
         y_true = []
         y_pred = []
         for imgs, labels in loader:
@@ -63,12 +90,34 @@ class ImageModel():
 
         return np.array(y_true), np.array(y_pred)
 
-    def load_model(self):
-        return model
+    def image_preprocessing(self, image):
+        transform = transforms.Compose([
+            # you can add other transformations in this list
+            # transforms.Grayscale(num_output_channels=1),
+            transforms.Resize(size=256),
+            transforms.CenterCrop(size=224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        image = Image.open(image).convert('RGB')
+        image = transform(image).unsqueeze(0)
+        return image
 
-    def load_best_model(MODEL_CKPT_PATH):
+    def inference_model(self):
+        best_model = self.load_best_model()
+        inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
+        return inference_model
+
+    def evaluate_model(self):
+        inference_model = self.inference_model()
+        print("Inference model:", inference_model)
+        print("Test Dataloader:", self.image_module.test_dataloader())
+        y_true, y_pred = image_model.evaluate(inference_model, self.image_module.test_dataloader())
+        return y_true, y_pred
+
+    def load_best_model(self):
         # Load best model  ################################################
-        model_ckpts = os.listdir(MODEL_CKPT_PATH)
+        model_ckpts = os.listdir(self.MODEL_CKPT_PATH)
         losses = []
         for model_ckpt in model_ckpts:
             # print(model_ckpt)
@@ -82,7 +131,6 @@ class ImageModel():
         losses = np.array(losses)
         best_model_index = np.argsort(losses)[0]
         best_model = model_ckpts[best_model_index]
-        print(best_model)
         return best_model
 
     def plot_precision_recall_curve(recall, precision):
@@ -132,68 +180,25 @@ if __name__ == '__main__':
         print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    # criterion = nn.CrossEntropyLoss()
-    batch_size = 8
-    # img_size = 224
-    # Number of epochs to train for
-    num_epochs = 15
-    # Flag for feature extracting. When False, we finetune the whole model,
-    #   when True we only update the reshaped layer params
-    feature_extract = True
-
-    # Callbacks  ################################################
-    # Save the model after every epoch by monitoring a quantity.
-    MODEL_CKPT_PATH = 'model/'
-    MODEL_CKPT = 'model/model-{epoch:02d}-{val_loss:.2f}'
-    # Other options: save_top_k=3
-    checkpoint_callback = ModelCheckpoint(filepath=MODEL_CKPT,
-                                          monitor='val_loss',
-                                          save_top_k=3,
-                                          mode='min',
-                                          save_weights_only=True)
-    # EarlyStopping  ################################################
-    # Monitor a validation metric and stop training when it stops improving.
-    early_stop_callback = EarlyStopping(monitor='val_loss',
-                                        min_delta=0.0,
-                                        patience=2,
-                                        verbose=False,
-                                        mode='min')
+    image_model = ImageModel()
+    checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Load images  ################################################
-    image_module = MyImageModule(batch_size=batch_size)
-    image_module.setup()
-    # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-    # val_samples = next(iter(image_module.val_dataloader()))
-    # val_imgs, val_labels = val_samples[0], val_samples[1]
-    # print(val_imgs.shape, val_labels.shape)
+    # image_module = MyImageModule(batch_size=batch_size)
+    # image_module.setup()
 
-    # Set a seed  ################################################
-    seed_everything(42)
 
-    # Load model  ################################################
-    model = CNN()
-
-    # Trainer  ################################################
-    trainer = pl.Trainer(max_epochs=num_epochs,
-                         default_root_dir='./checkpoints',
-                         gpus=1,
-                         deterministic=True,
-                         callbacks=[early_stop_callback],
-                         checkpoint_callback=checkpoint_callback)
-
-    trainer.fit(model, image_module)
-
-    # Test  ################################################
-    trainer.test()
+    # Train model  ################################################
+    # image_model.call_trainner()
     # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
-    # best_model = load_best_model(MODEL_CKPT_PATH)
+    # best_model = image_model.load_best_model()
     # print("Best model:", best_model)
 
     # Evaluate model  ################################################
-    # inference_model = CNN.load_from_checkpoint(MODEL_CKPT_PATH + best_model)
-    # y_true, y_pred = evaluate(inference_model, image_module.test_dataloader())
+    # inference_model = image_model.inference_model()
+    y_true, y_pred = image_model.evaluate_model()
 
     # Generate binary correctness labels across classes
     # binary_ground_truth = label_binarize(y_true,

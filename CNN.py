@@ -66,7 +66,7 @@ class CNN(pl.LightningModule):
         self.feature_extractor = model_func(pretrained=True)
 
         _layers = list(self.feature_extractor.children())[:-1]
-        print(_layers)
+        # print(_layers)
         # self.feature_extractor = torch.nn.Sequential(*_layers)
 
         # 2. Classifier:
@@ -120,7 +120,7 @@ class CNN(pl.LightningModule):
 
         output_feat = self._forward_features(input)
         print("output_feat")
-        print(output_feat)
+        # print(output_feat)
         n_size = output_feat.data.view(batch_size, -1).size(1)
         print("n_size")
         print(n_size)
