@@ -26,6 +26,7 @@ class ImageModel():
                  num_epochs=15,
                  img_size=256,
                  feature_extract=True):
+        super(ImageModel, self).__init__()
         # Parameters
         self.batch_size = batch_size
         self.num_epochs = num_epochs
@@ -95,7 +96,6 @@ class ImageModel():
     def get_activation(self, name):
         def hook(model, input, output):
             self.activation[name] = output.detach()
-
         return hook
 
     def evaluate_image(self, image, model):
@@ -151,6 +151,12 @@ class ImageModel():
         best_model_index = np.argsort(losses)[0]
         best_model = model_ckpts[best_model_index]
         return best_model
+
+    def load_model(self, name):
+        # model_ckpts = os.listdir(self.MODEL_CKPT_PATH)
+        model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + name)
+        print(model)
+        return model
 
     def plot_precision_recall_curve(self, recall, precision):
         fig, ax = plt.subplots()
