@@ -98,6 +98,12 @@ class ImageModel():
             self.activation[name] = output.detach()
         return hook
 
+    # Returns the size of features tensor
+    def get_size_features(self, model):
+
+        feature_size = model.get_size()
+        return feature_size
+
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
         model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
@@ -220,9 +226,12 @@ if __name__ == '__main__':
     print(inference_model)
 
     #  Evaluate output  ################################################
-    image = Image.open("./images/fail/img1605601451.8657722.png")
+    # image = Image.open("./images/fail/img1605601451.8657722.png")
     # image_tensor = image_model.image_preprocessing(image)
-    image_model.evaluate_image(image, inference_model)
+    # image_model.evaluate_image(image, inference_model)
+
+    feature_size = image_model.get_size_features(inference_model)
+    print(feature_size)
 
     # Evaluate model  ################################################
     # inference_model = image_model.inference_model()
