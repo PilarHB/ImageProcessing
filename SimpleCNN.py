@@ -115,6 +115,10 @@ class SimpleCNN(pl.LightningModule):
         x = self.pool2(F.relu(self.conv4(x)))
         return x
 
+    def get_size(self):
+        n_sizes = self._get_conv_output(self.dim)
+        return n_sizes
+
     # loss function
     def loss(self, logits, labels):
         return self.loss_func(input=logits, target=labels)
@@ -211,12 +215,14 @@ class SimpleCNN(pl.LightningModule):
     # define optimizers
     def configure_optimizers(self):
         # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
-        optimizer1 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
+        # optimizer1 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
+        optimizer2 = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         # Decay LR by a factor of 0.1 every 7 epochs
-        scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
+         #scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
         # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
-        return (
-            # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
-            {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
-            # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
-        )
+        return optimizer2
+        # return (
+        #     # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
+        #     {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
+        #     # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+        # )

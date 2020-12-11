@@ -10,6 +10,7 @@ import torchvision.transforms.functional as F
 from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.metrics.functional import precision_recall_curve, auc
+from sklearn.metrics import roc_curve
 from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
@@ -41,8 +42,8 @@ class ImageModel():
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
-        self.image_module = MyImageModule(batch_size=self.batch_size)
-        self.image_module.setup()
+        # self.image_module = MyImageModule(batch_size=self.batch_size)
+        # self.image_module.setup()
         self.activation = {}
 
     def call_trainer(self):
@@ -181,7 +182,7 @@ class ImageModel():
         y_test = y_true
         y_score = y_pred
 
-        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score, pos_label=2)
+        fpr, tpr, thresholds = roc_curve(y_test, y_score, pos_label=2)
         roc_auc = auc(fpr, tpr)
 
         fig, ax = plt.figure()
@@ -230,8 +231,8 @@ if __name__ == '__main__':
     # image_tensor = image_model.image_preprocessing(image)
     # image_model.evaluate_image(image, inference_model)
 
-    feature_size = image_model.get_size_features(inference_model)
-    print(feature_size)
+    # feature_size = image_model.get_size_features(inference_model)
+    # print(feature_size)
 
     # Evaluate model  ################################################
     # inference_model = image_model.inference_model()
