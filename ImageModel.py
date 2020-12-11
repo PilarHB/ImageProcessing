@@ -36,8 +36,9 @@ class ImageModel():
         self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
         # Save the model after every epoch by monitoring a quantity.
-        self.MODEL_CKPT_PATH = 'model/'
-        self.MODEL_CKPT = 'model/model-{epoch:02d}-{val_loss:.2f}'
+        current_path = os.path.dirname(os.path.realpath(__file__))
+        self.MODEL_CKPT_PATH = os.path.join(current_path, 'model/')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
@@ -88,10 +89,8 @@ class ImageModel():
         y_pred = []
         for imgs, labels in loader:
             logits = model(imgs)
-
             y_true.extend(labels)
             y_pred.extend(logits.detach().numpy())
-
         return np.array(y_true), np.array(y_pred)
 
     def get_activation(self, name):
@@ -134,6 +133,7 @@ class ImageModel():
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
         return inference_model
 
+    # TODO: Revisar este método
     def evaluate_model(self):
         inference_model = self.inference_model()
         print("Inference model:", inference_model)
