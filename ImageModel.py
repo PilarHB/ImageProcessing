@@ -35,8 +35,9 @@ class ImageModel():
         self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
         # Save the model after every epoch by monitoring a quantity.
-        self.MODEL_CKPT_PATH = 'model/'
-        self.MODEL_CKPT = 'model/model-{epoch:02d}-{val_loss:.2f}'
+        current_path = os.path.dirname(os.path.realpath(__file__))
+        self.MODEL_CKPT_PATH = os.path.join(current_path, 'model/')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################

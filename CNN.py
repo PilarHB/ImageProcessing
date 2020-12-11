@@ -90,6 +90,7 @@ class CNN(pl.LightningModule):
         # 1. Feature extraction:
         t = self.feature_extractor(t)
         features = t.squeeze(-1).squeeze(-1)
+
         # 2. Classifier (returns logits):
         t = self.fc(features)
         return features, t
