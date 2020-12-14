@@ -146,10 +146,10 @@ class CNN(pl.LightningModule):
         logits = self(x)
 
         # 2. Compute loss & accuracy:
-        train_loss = F.cross_entropy(logits, y)
+        train_loss = F.cross_entropy(logits[1], y)
         # train_loss = self.loss(logits, y)
         print(train_loss)
-        preds = torch.argmax(logits, dim=1)
+        preds = torch.argmax(logits[1], dim=1)
         # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
@@ -187,8 +187,8 @@ class CNN(pl.LightningModule):
 
         # 2. Compute loss & accuracy:
         # val_loss = self.loss(logits, y)
-        val_loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        val_loss = F.cross_entropy(logits[1], y)
+        preds = torch.argmax(logits[1], dim=1)
         # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
@@ -218,8 +218,8 @@ class CNN(pl.LightningModule):
 
         # 2. Compute loss & accuracy:
         # test_loss = self.loss(logits, y)
-        test_loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        test_loss = F.cross_entropy(logits[1], y)
+        preds = torch.argmax(logits[1], dim=1)
         # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
 

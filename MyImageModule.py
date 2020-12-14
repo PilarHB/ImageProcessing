@@ -103,7 +103,7 @@ def find_classes(dir):
     classes = [d.name for d in os.scandir(dir) if d.is_dir()]
     classes.sort()
     class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
-    return classes,
+    return classes
 
 
 if __name__ == '__main__':

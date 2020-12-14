@@ -14,6 +14,9 @@ from sklearn.metrics import roc_curve
 from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
+from pytorch_lightning.loggers import TensorBoardLogger
+from torch.utils.tensorboard import SummaryWriter
+
 
 from CNN import CNN
 from MyImageModule import MyImageModule
@@ -47,26 +50,6 @@ class ImageModel():
         # self.image_module.setup()
         self.activation = {}
 
-    def call_trainer(self):
-        # Load images  ################################################
-
-        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        # val_samples = next(iter(image_module.val_dataloader()))
-        # val_imgs, val_labels = val_samples[0], val_samples[1]
-        # print(val_imgs.shape, val_labels.shape)
-
-        # Trainer  ################################################
-        trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             default_root_dir='./checkpoints',
-                             gpus=1,
-                             deterministic=True,
-                             callbacks=[early_stop_callback],
-                             checkpoint_callback=checkpoint_callback)
-
-        trainer.fit(self.model, self.image_module)
-        # Test  ################################################
-        trainer.test()
-
     def config_callbacks(self):
         # Checkpoint  ################################################
         # Saves the models so it is possible to access afterwards
@@ -83,6 +66,35 @@ class ImageModel():
                                             verbose=False,
                                             mode='min')
         return checkpoint_callback, early_stop_callback
+
+    def call_trainer(self):
+        # Load images  ################################################
+        self.image_module = MyImageModule(batch_size=self.batch_size)
+        self.image_module.setup()
+        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        # val_samples = next(iter(image_module.val_dataloader()))
+        # val_imgs, val_labels = val_samples[0], val_samples[1]
+        # print(val_imgs.shape, val_labels.shape)
+
+        # Load callbacks ########################################
+        checkpoint_callback, early_stop_callback = self.config_callbacks()
+
+        # Logger ################################################
+        # Tensorboard Logger used
+        logger = TensorBoardLogger('tb_logs', name='my_model')
+
+        # Trainer  ################################################
+        trainer = pl.Trainer(max_epochs=self.num_epochs,
+                             default_root_dir='./checkpoints',
+                             gpus=1,
+                             logger=logger,
+                             deterministic=True,
+                             callbacks=[early_stop_callback],
+                             checkpoint_callback=checkpoint_callback)
+
+        trainer.fit(self.model, self.image_module)
+        # Test  ################################################
+        # trainer.test()
 
     def evaluate(self, model, loader):
         y_true = []
@@ -104,6 +116,7 @@ class ImageModel():
         feature_size = model.get_size()
         return feature_size
 
+    @torch.no_grad()
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
         model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
@@ -111,9 +124,8 @@ class ImageModel():
         # print("Features", self.activation['classifier[6]'])
         # print("Output", output[0])
         features = output[0]
-        features_size = output[0].shape
-        print("features size", features_size)
-        return features, features_size
+        # features_size = output[0].shape
+        return features.detach().numpy
 
     def image_preprocessing(self, image):
         transform = transforms.Compose([
@@ -133,7 +145,7 @@ class ImageModel():
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
         return inference_model
 
-    # TODO: Revisar este método
+    # TODO: Revisar este método, creo que no es necesario
     def evaluate_model(self):
         inference_model = self.inference_model()
         print("Inference model:", inference_model)
