@@ -125,7 +125,7 @@ class ImageModel():
         # print("Output", output[0])
         features = output[0]
         # features_size = output[0].shape
-        return features.detach().numpy
+        return features.detach().numpy()
 
     def image_preprocessing(self, image):
         transform = transforms.Compose([
