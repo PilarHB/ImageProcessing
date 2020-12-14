@@ -174,9 +174,22 @@ class CNN(pl.LightningModule):
         train_acc_mean = torch.stack([output['num_correct']
                                       for output in outputs]).sum().float()
         train_acc_mean /= (len(outputs) * self.batch_size)
-        return {'log': {'train_loss': train_loss_mean,
-                        'train_acc': train_acc_mean,
-                        'step': self.current_epoch}}
+
+        self.logger.experiment.add_scalar('Loss/Train',
+                                          train_acc_mean,
+                                          self.current_epoch)
+
+        self.logger.experiment.add_scalar('Accuracy/Train',
+                                          train_acc_mean,
+                                          self.current_epoch)
+
+        epoch_dictionary = {
+            # required
+            'Average train_loss': train_loss_mean,
+            'Average train_acc': train_acc_mean
+        }
+
+        return epoch_dictionary
 
     # If you need to do something with all the outputs of each training_step
 
@@ -192,13 +205,13 @@ class CNN(pl.LightningModule):
         # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
+
         self.log('val_loss', val_loss, on_step=True, on_epoch=True, logger=True)
         self.log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
         # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         return {'val_loss': val_loss,
                 'num_correct': num_correct}
-
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
@@ -208,9 +221,9 @@ class CNN(pl.LightningModule):
         val_acc_mean = torch.stack([output['num_correct']
                                     for output in outputs]).sum().float()
         val_acc_mean /= (len(outputs) * self.batch_size)
-        return {'log': {'val_loss': val_loss_mean,
-                        'val_acc': val_acc_mean,
-                        'step': self.current_epoch}}
+
+        tensorboard_logs = {'val_loss': val_loss_mean, "Accuracy": val_acc_mean}
+        return {'val_loss': val_loss_mean, 'log': tensorboard_logs}
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -227,8 +240,12 @@ class CNN(pl.LightningModule):
         self.log('test_loss', test_loss, on_step=True, on_epoch=True, logger=True)
         self.log('test_acc', acc, on_step=True, on_epoch=True, logger=True)
         # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+
+        logs = {'test_loss': test_loss}
         return {'test_loss': test_loss,
-                'num_correct': num_correct}
+                'num_correct': num_correct,
+                'log': logs,
+                'progress_bar': logs}
 
     # define optimizers
     def configure_optimizers(self):
@@ -239,7 +256,7 @@ class CNN(pl.LightningModule):
         scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
         # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
         return (
-                # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
-                {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
-                # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
-         )
+            # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
+            {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
+            # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+        )

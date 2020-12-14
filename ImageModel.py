@@ -6,6 +6,7 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
+import torchvision
 import torchvision.transforms.functional as F
 from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -49,6 +50,7 @@ class ImageModel():
         # self.image_module = MyImageModule(batch_size=self.batch_size)
         # self.image_module.setup()
         self.activation = {}
+        self.writer = SummaryWriter('tb_logs/pruebas')
 
     def config_callbacks(self):
         # Checkpoint  ################################################
@@ -71,10 +73,18 @@ class ImageModel():
         # Load images  ################################################
         self.image_module = MyImageModule(batch_size=self.batch_size)
         self.image_module.setup()
+
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        # val_samples = next(iter(image_module.val_dataloader()))
-        # val_imgs, val_labels = val_samples[0], val_samples[1]
-        # print(val_imgs.shape, val_labels.shape)
+        val_samples = next(iter(self.image_module.val_dataloader()))
+        val_imgs, val_labels = val_samples[0], val_samples[1]
+        # print(val_imgs.shape)
+        # print(val_labels.shape)
+        grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
+        # show images
+        # plt.imshow(grid)
+        # write to tensorboard
+        self.writer.add_image('prueba', grid)
+        # self.writer.close()
 
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self.config_callbacks()
