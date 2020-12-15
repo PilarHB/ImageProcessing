@@ -55,6 +55,9 @@ class CNN(pl.LightningModule):
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
 
+        # reference dummy image for logging graph
+        # self.reference_image=torch.rand((1,1,28,28))
+
         self.__build_model()
 
     def __build_model(self):
@@ -148,14 +151,15 @@ class CNN(pl.LightningModule):
         # 2. Compute loss & accuracy:
         train_loss = F.cross_entropy(logits[1], y)
         # train_loss = self.loss(logits, y)
-        print(train_loss)
+        # print(train_loss)
         preds = torch.argmax(logits[1], dim=1)
         # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
+
         self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         # 3. Outputs:
         tqdm_dict = {'train_loss': train_loss}
@@ -164,10 +168,12 @@ class CNN(pl.LightningModule):
                               'log': tqdm_dict,
                               'progress_bar': tqdm_dict})
         return output
-        # return train_loss
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
+
+        # Logging activations
+        # self.showActivations(self.reference_image)
 
         train_loss_mean = torch.stack([output['loss']
                                        for output in outputs]).mean()
@@ -175,6 +181,7 @@ class CNN(pl.LightningModule):
                                       for output in outputs]).sum().float()
         train_acc_mean /= (len(outputs) * self.batch_size)
 
+        # Logging scalars
         self.logger.experiment.add_scalar('Loss/Train',
                                           train_acc_mean,
                                           self.current_epoch)
@@ -182,6 +189,8 @@ class CNN(pl.LightningModule):
         self.logger.experiment.add_scalar('Accuracy/Train',
                                           train_acc_mean,
                                           self.current_epoch)
+        # Logging histograms
+        self.custom_histogram_adder()
 
         epoch_dictionary = {
             # required
@@ -208,7 +217,7 @@ class CNN(pl.LightningModule):
 
         self.log('val_loss', val_loss, on_step=True, on_epoch=True, logger=True)
         self.log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         return {'val_loss': val_loss,
                 'num_correct': num_correct}
@@ -221,6 +230,10 @@ class CNN(pl.LightningModule):
         val_acc_mean = torch.stack([output['num_correct']
                                     for output in outputs]).sum().float()
         val_acc_mean /= (len(outputs) * self.batch_size)
+
+        # Adding logs to TensorBoard
+        self.logger.experiment.add_scalar("Loss/Val", val_loss_mean, self.current_epoch)
+        self.logger.experiment.add_scalar("Accuracy/Val", val_acc_mean, self.current_epoch)
 
         tensorboard_logs = {'val_loss': val_loss_mean, "Accuracy": val_acc_mean}
         return {'val_loss': val_loss_mean, 'log': tensorboard_logs}
@@ -239,13 +252,29 @@ class CNN(pl.LightningModule):
         acc = accuracy(preds, y)
         self.log('test_loss', test_loss, on_step=True, on_epoch=True, logger=True)
         self.log('test_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         logs = {'test_loss': test_loss}
         return {'test_loss': test_loss,
                 'num_correct': num_correct,
                 'log': logs,
                 'progress_bar': logs}
+
+    def test_epoch_end(self, outputs):
+        # OPTIONAL
+        # The code that runs as a validation epoch finished
+        # Used for metric evaluation
+        test_loss_mean = torch.stack([output['test_loss']
+                                     for output in outputs]).mean()
+        test_acc_mean = torch.stack([output['num_correct']
+                                    for output in outputs]).sum().float()
+        test_acc_mean /= (len(outputs) * self.batch_size)
+
+        # Logging Data to TensorBoard
+        self.logger.experiment.add_scalar("Loss/Test", test_loss_mean, self.current_epoch)
+        self.logger.experiment.add_scalar("Accuracy/Test", test_acc_mean, self.current_epoch)
+
+        return {'test_loss': test_loss_mean}
 
     # define optimizers
     def configure_optimizers(self):
@@ -260,3 +289,10 @@ class CNN(pl.LightningModule):
             {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
             # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
         )
+
+    def custom_histogram_adder(self):
+        # A custom defined function that adds Histogram to TensorBoard
+        # Iterating over all parameters and logging them
+        for name, params in self.named_parameters():
+            self.logger.experiment.add_histogram(name, params, self.current_epoch)
+
