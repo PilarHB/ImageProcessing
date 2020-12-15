@@ -104,7 +104,7 @@ class ImageModel():
 
         trainer.fit(self.model, self.image_module)
         # Test  ################################################
-        # trainer.test()
+        trainer.test()
 
     def evaluate(self, model, loader):
         y_true = []

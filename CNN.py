@@ -95,6 +95,8 @@ class CNN(pl.LightningModule):
         features = t.squeeze(-1).squeeze(-1)
         # 2. Classifier (returns logits):
         t = self.fc(features)
+        # We want the probability to sum 1
+        t = F.log_softmax(t, dim=1)
         return features, t
 
     def set_parameter_requires_grad(model, feature_extracting):
@@ -153,10 +155,10 @@ class CNN(pl.LightningModule):
         # train_loss = self.loss(logits, y)
         # print(train_loss)
         preds = torch.argmax(logits[1], dim=1)
-        # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
 
+        # Logging
         self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
         self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
@@ -295,4 +297,9 @@ class CNN(pl.LightningModule):
         # Iterating over all parameters and logging them
         for name, params in self.named_parameters():
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
+
+
+
+
+
 
