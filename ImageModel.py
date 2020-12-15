@@ -6,13 +6,18 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
+import torchvision
 import torchvision.transforms.functional as F
 from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.metrics.functional import precision_recall_curve, auc
+from sklearn.metrics import roc_curve
 from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
+from pytorch_lightning.loggers import TensorBoardLogger
+from torch.utils.tensorboard import SummaryWriter
+
 
 from CNN import CNN
 from MyImageModule import MyImageModule
@@ -42,29 +47,10 @@ class ImageModel():
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
-        self.image_module = MyImageModule(batch_size=self.batch_size)
-        self.image_module.setup()
+        # self.image_module = MyImageModule(batch_size=self.batch_size)
+        # self.image_module.setup()
         self.activation = {}
-
-    def call_trainer(self):
-        # Load images  ################################################
-
-        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        # val_samples = next(iter(image_module.val_dataloader()))
-        # val_imgs, val_labels = val_samples[0], val_samples[1]
-        # print(val_imgs.shape, val_labels.shape)
-
-        # Trainer  ################################################
-        trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             default_root_dir='./checkpoints',
-                             gpus=1,
-                             deterministic=True,
-                             callbacks=[early_stop_callback],
-                             checkpoint_callback=checkpoint_callback)
-
-        trainer.fit(self.model, self.image_module)
-        # Test  ################################################
-        trainer.test()
+        self.writer = SummaryWriter('tb_logs/pruebas')
 
     def config_callbacks(self):
         # Checkpoint  ################################################
@@ -83,15 +69,50 @@ class ImageModel():
                                             mode='min')
         return checkpoint_callback, early_stop_callback
 
+    def call_trainer(self):
+        # Load images  ################################################
+        self.image_module = MyImageModule(batch_size=self.batch_size)
+        self.image_module.setup()
+
+        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        val_samples = next(iter(self.image_module.val_dataloader()))
+        val_imgs, val_labels = val_samples[0], val_samples[1]
+        # print(val_imgs.shape)
+        # print(val_labels.shape)
+        grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
+        # show images
+        # plt.imshow(grid)
+        # write to tensorboard
+        self.writer.add_image('prueba', grid)
+        # self.writer.close()
+
+        # Load callbacks ########################################
+        checkpoint_callback, early_stop_callback = self.config_callbacks()
+
+        # Logger ################################################
+        # Tensorboard Logger used
+        logger = TensorBoardLogger('tb_logs', name='my_model')
+
+        # Trainer  ################################################
+        trainer = pl.Trainer(max_epochs=self.num_epochs,
+                             default_root_dir='./checkpoints',
+                             gpus=1,
+                             logger=logger,
+                             deterministic=True,
+                             callbacks=[early_stop_callback],
+                             checkpoint_callback=checkpoint_callback)
+
+        trainer.fit(self.model, self.image_module)
+        # Test  ################################################
+        # trainer.test()
+
     def evaluate(self, model, loader):
         y_true = []
         y_pred = []
         for imgs, labels in loader:
             logits = model(imgs)
-
             y_true.extend(labels)
             y_pred.extend(logits.detach().numpy())
-
         return np.array(y_true), np.array(y_pred)
 
     def get_activation(self, name):
@@ -105,6 +126,7 @@ class ImageModel():
         feature_size = model.get_size()
         return feature_size
 
+    @torch.no_grad()
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
         model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
@@ -112,9 +134,8 @@ class ImageModel():
         # print("Features", self.activation['classifier[6]'])
         # print("Output", output[0])
         features = output[0]
-        features_size = output[0].shape
-        print("features size", features_size)
-        return features, features_size
+        # features_size = output[0].shape
+        return features.detach().numpy()
 
     def image_preprocessing(self, image):
         transform = transforms.Compose([
@@ -134,6 +155,7 @@ class ImageModel():
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
         return inference_model
 
+    # TODO: Revisar este método, creo que no es necesario
     def evaluate_model(self):
         inference_model = self.inference_model()
         print("Inference model:", inference_model)
@@ -182,7 +204,7 @@ class ImageModel():
         y_test = y_true
         y_score = y_pred
 
-        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_score, pos_label=2)
+        fpr, tpr, thresholds = roc_curve(y_test, y_score, pos_label=2)
         roc_auc = auc(fpr, tpr)
 
         fig, ax = plt.figure()
@@ -231,8 +253,8 @@ if __name__ == '__main__':
     # image_tensor = image_model.image_preprocessing(image)
     # image_model.evaluate_image(image, inference_model)
 
-    feature_size = image_model.get_size_features(inference_model)
-    print(feature_size)
+    # feature_size = image_model.get_size_features(inference_model)
+    # print(feature_size)
 
     # Evaluate model  ################################################
     # inference_model = image_model.inference_model()
