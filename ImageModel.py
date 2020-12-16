@@ -50,7 +50,7 @@ class ImageModel():
         # self.image_module = MyImageModule(batch_size=self.batch_size)
         # self.image_module.setup()
         self.activation = {}
-        self.writer = SummaryWriter('tb_logs/pruebas')
+        self.writer = SummaryWriter('tb_logs')
 
     def config_callbacks(self):
         # Checkpoint  ################################################

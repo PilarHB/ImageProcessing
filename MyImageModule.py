@@ -85,6 +85,14 @@ class MyImageModule(pl.LightningDataModule):
         test_loader = torch.utils.data.DataLoader(self.test_data, batch_size=self.batch_size)
         return test_loader
 
+    # TODO: Método para acceder a las clases
+    def find_classes(self):
+        classes = [d.name for d in os.scandir(self.data_dir) if d.is_dir()]
+        classes.sort()
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        return classes
+
+
 
 def imshow(inp, title=None):
     """Imshow for Tensor."""
