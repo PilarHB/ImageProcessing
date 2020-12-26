@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 import os
 
 import torchvision
@@ -29,8 +29,6 @@ from sklearn.metrics import confusion_matrix
 # from plotcm import plot_confusion_matrix
 import pdb
 
-
-#  --- Utility functions ---
 
 class CNN(pl.LightningModule):
 
@@ -152,7 +150,7 @@ class CNN(pl.LightningModule):
 
         # 2. Compute loss & accuracy:
         train_loss = F.cross_entropy(logits[1], y)
-        # train_loss = self.loss(logits, y)
+        # train_loss = self.loss(logits[1], y)
         # print(train_loss)
         preds = torch.argmax(logits[1], dim=1)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
@@ -164,6 +162,7 @@ class CNN(pl.LightningModule):
         self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         # 3. Outputs:
+        # 3. Outputs:
         tqdm_dict = {'train_loss': train_loss}
         output = OrderedDict({'loss': train_loss,
                               'num_correct': num_correct,
@@ -171,11 +170,11 @@ class CNN(pl.LightningModule):
                               'progress_bar': tqdm_dict})
         return output
 
+
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
 
         # Logging activations
-        # self.showActivations(self.reference_image)
 
         train_loss_mean = torch.stack([output['loss']
                                        for output in outputs]).mean()
@@ -185,7 +184,7 @@ class CNN(pl.LightningModule):
 
         # Logging scalars
         self.logger.experiment.add_scalar('Loss/Train',
-                                          train_acc_mean,
+                                          train_loss_mean,
                                           self.current_epoch)
 
         self.logger.experiment.add_scalar('Accuracy/Train',
@@ -194,13 +193,8 @@ class CNN(pl.LightningModule):
         # Logging histograms
         self.custom_histogram_adder()
 
-        epoch_dictionary = {
-            # required
-            'Average train_loss': train_loss_mean,
-            'Average train_acc': train_acc_mean
-        }
-
-        return epoch_dictionary
+        tensorboard_logs = {'train_loss': train_loss_mean, "train_accuracy": train_acc_mean}
+        return {'train_loss': train_loss_mean, 'log': tensorboard_logs}
 
     # If you need to do something with all the outputs of each training_step
 
@@ -222,6 +216,7 @@ class CNN(pl.LightningModule):
         self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         return {'val_loss': val_loss,
+                'val_acc': acc,
                 'num_correct': num_correct}
 
     def validation_epoch_end(self, outputs):
@@ -237,7 +232,7 @@ class CNN(pl.LightningModule):
         self.logger.experiment.add_scalar("Loss/Val", val_loss_mean, self.current_epoch)
         self.logger.experiment.add_scalar("Accuracy/Val", val_acc_mean, self.current_epoch)
 
-        tensorboard_logs = {'val_loss': val_loss_mean, "Accuracy": val_acc_mean}
+        tensorboard_logs = {'val_loss': val_loss_mean, "val_accuracy": val_acc_mean}
         return {'val_loss': val_loss_mean, 'log': tensorboard_logs}
 
     def test_step(self, batch, batch_idx):
@@ -276,13 +271,14 @@ class CNN(pl.LightningModule):
         self.logger.experiment.add_scalar("Loss/Test", test_loss_mean, self.current_epoch)
         self.logger.experiment.add_scalar("Accuracy/Test", test_acc_mean, self.current_epoch)
 
-        return {'test_loss': test_loss_mean}
+        tensorboard_logs = {'test_loss': test_loss_mean, "test_accuracy": test_acc_mean}
+        return {'test_loss': test_loss_mean, 'log': tensorboard_logs}
 
     # define optimizers
     def configure_optimizers(self):
 
         # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
-        optimizer1 = torch.optim.SGD(self.feature_extractor.parameters(), lr=0.002, momentum=0.9)
+        optimizer1 = torch.optim.SGD(self.parameters(), lr=0.002, momentum=0.9)
         # Decay LR by a factor of 0.1 every 7 epochs
         scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
         # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)

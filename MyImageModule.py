@@ -37,7 +37,7 @@ class MyImageModule(pl.LightningDataModule):
     # self.val_data = datasets.ImageFolder(val_dir, transform=transform)
     # elf.test_data = datasets.ImageFolder(test_dir, transform=transform)
 
-    def setup(self, step=None):
+    def setup(self, stage=None):
         self.transform = transforms.Compose([
             # you can add other transformations in this list
             # transforms.Grayscale(num_output_channels=1),
@@ -92,37 +92,3 @@ class MyImageModule(pl.LightningDataModule):
         class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
         return classes
 
-
-
-def imshow(inp, title=None):
-    """Imshow for Tensor."""
-    inp = inp.numpy().transpose((1, 2, 0))
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    inp = std * inp + mean
-    inp = np.clip(inp, 0, 1)
-    plt.imshow(inp)
-    if title is not None:
-        plt.title(title)
-    plt.pause(0.001)  # pause a bit so that plots are updated
-
-
-def find_classes(dir):
-    classes = [d.name for d in os.scandir(dir) if d.is_dir()]
-    classes.sort()
-    class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
-    return classes
-
-
-if __name__ == '__main__':
-    batch_size = 8
-    image_module = MyImageModule(batch_size=batch_size)
-    image_module.setup()
-    # Get a batch of training data
-    inputs, classes = next(iter(image_module.train_dataloader()))
-    # Make a grid from batch
-    out = torchvision.utils.make_grid(inputs)
-    class_names = find_classes('./images/training/')
-    print(class_names)
-
-    imshow(out, title=[class_names[x] for x in classes])

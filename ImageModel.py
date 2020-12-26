@@ -36,7 +36,8 @@ class ImageModel():
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.img_size = img_size
-        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped layer params
+        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
+        # layer params
         self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
         # Save the model after every epoch by monitoring a quantity.
@@ -47,15 +48,16 @@ class ImageModel():
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
+        self.image_module = MyImageModule(batch_size=self.batch_size)
         # self.image_module = MyImageModule(batch_size=self.batch_size)
-        # self.image_module.setup()
         self.activation = {}
         self.writer = SummaryWriter('tb_logs')
 
     def config_callbacks(self):
         # Checkpoint  ################################################
         # Saves the models so it is possible to access afterwards
-        checkpoint_callback = ModelCheckpoint(filepath=self.MODEL_CKPT,
+        checkpoint_callback = ModelCheckpoint(dirpath= self.MODEL_CKPT_PATH,
+                                              filename=self.MODEL_CKPT,
                                               monitor='val_loss',
                                               save_top_k=3,
                                               mode='min',
@@ -71,20 +73,17 @@ class ImageModel():
 
     def call_trainer(self):
         # Load images  ################################################
-        self.image_module = MyImageModule(batch_size=self.batch_size)
         self.image_module.setup()
 
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
-        val_imgs, val_labels = val_samples[0], val_samples[1]
+        # val_imgs, val_labels = val_samples[0], val_samples[1]
         # print(val_imgs.shape)
         # print(val_labels.shape)
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
-        # show images
-        # plt.imshow(grid)
         # write to tensorboard
         self.writer.add_image('prueba', grid)
-        # self.writer.close()
+        self.writer.close()
 
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self.config_callbacks()
@@ -95,14 +94,12 @@ class ImageModel():
 
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             default_root_dir='./checkpoints',
                              gpus=1,
                              logger=logger,
                              deterministic=True,
-                             callbacks=[early_stop_callback],
-                             checkpoint_callback=checkpoint_callback)
+                             callbacks=[early_stop_callback, checkpoint_callback])
 
-        trainer.fit(self.model, self.image_module)
+        trainer.fit(model=self.model, datamodule=self.image_module)
         # Test  ################################################
         trainer.test()
 
@@ -150,6 +147,7 @@ class ImageModel():
         print(image_tensor.shape)
         return image_tensor
 
+    @torch.no_grad()
     def inference_model(self):
         best_model = self.load_best_model()
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
@@ -211,7 +209,7 @@ class ImageModel():
         lw = 2
         plt.plot(fpr, tpr, color='darkorange',
                  lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
-        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')

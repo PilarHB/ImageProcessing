@@ -2,6 +2,8 @@
 import itertools
 import os
 import io
+from collections import Iterable
+
 import torch
 import numpy as np
 import re
@@ -18,7 +20,6 @@ from sklearn.metrics import confusion_matrix
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
-
 from CNN import CNN
 from MyImageModule import MyImageModule
 
@@ -31,7 +32,8 @@ from CNN import CNN
 from MyImageModule import MyImageModule
 from ImageModel import ImageModel
 
-def plot_ROC_curve(preds,targets,pos_label):
+
+def plot_ROC_curve(preds, targets, pos_label):
     # Compute ROC curve and ROC area for each class
     y_true = targets.detach().numpy()
     y_pred = preds.detach().numpy()
@@ -52,7 +54,7 @@ def plot_ROC_curve(preds,targets,pos_label):
     plt.legend(loc="lower right")
     plt.show()
 
-
+@torch.no_grad()
 def evaluate(self, model, loader):
     y_true = []
     y_pred = []
@@ -64,6 +66,7 @@ def evaluate(self, model, loader):
 
 
 # make a class prediction for one row of data
+@torch.no_grad()
 def predict(model, loader):
     # convert row to data
     y_pred = []
@@ -75,7 +78,7 @@ def predict(model, loader):
         y_true.extend(labels)
     return np.array(y_true), np.array(y_pred)
 
-
+@torch.no_grad()
 def get_all_preds(model, loader):
     all_preds = torch.tensor([])
     all_targets = torch.tensor([])
@@ -113,14 +116,17 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
 
+@torch.no_grad()
 def get_num_correct(preds, labels):
     return preds.argmax(dim=1).eq(labels).sum().item()
+
 
 def find_classes(dir):
     classes = [d.name for d in os.scandir(dir) if d.is_dir()]
     classes.sort()
     class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
     return classes
+
 
 def add_pr_curve_tensorboard(writer, class_index, test_probs, test_preds, classes, global_step=0):
     '''
@@ -135,6 +141,8 @@ def add_pr_curve_tensorboard(writer, class_index, test_probs, test_preds, classe
                         tensorboard_probs,
                         global_step=global_step)
     writer.close()
+
+@torch.no_grad()
 def get_probabilities(model, testloader):
     class_probs = []
     class_preds = []
@@ -153,11 +161,25 @@ def get_probabilities(model, testloader):
 
     return test_probs, test_preds
 
+
+def show_activations(model):
+    # _layers = list(model.children())[:-1]
+    _layers = list(model.children())
+    # print(_layers)
+    for layer in _layers:
+        print("layer", layer)
+        if isinstance(layer, Iterable):
+            for i in layer:
+                print("sublayer", i)
+        # else:
+        #     print(layer)
+
+
 # --MAIN ------------------------------------------------------------------------------------------------------
 
 # instantiate class to handle model
 image_model = ImageModel()
-checkpoint_callback, early_stop_callback = image_model.config_callbacks()
+# checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
 image_module = MyImageModule(batch_size=32)
 image_module.setup()
@@ -177,16 +199,16 @@ inference_model = image_model.inference_model()
 print("Inference model:", inference_model)
 # print("Test Dataloader:", image_module.test_dataloader())
 y_true, y_pred = predict(inference_model, image_module.test_dataloader())
-print("y_true", y_true)
-print("y_pred", y_true)
+# ("y_true", y_true)
+# print("y_pred", y_true)
 
 test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
 # print("Test preds", test_preds)
 # print("Test_targets", test_targets)
 
 # Plot metrics - Precision-Recall Curve
-# precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
-# image_model.plot_precision_recall_curve(recall, precision)
+precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
+image_model.plot_precision_recall_curve(recall, precision)
 # image_model.plot_roc_curve(y_true, y_pred)
 
 # With tensors
@@ -194,7 +216,7 @@ preds_correct1 = get_num_correct(test_preds, test_targets)
 print("--With tensors--")
 print('total correct:', preds_correct1)
 print('accuracy:', preds_correct1 / len(image_module.test_data))
-# Without tensors
+# # Without tensors
 preds_correct2 = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
 print("--Without tensors--")
 print('total correct:', preds_correct2)
@@ -203,10 +225,10 @@ print('accuracy:', preds_correct2 / len(image_module.test_data))
 # Confusion Matrix
 cm = confusion_matrix(test_targets, test_preds.argmax(dim=1))
 class_names = find_classes('./images/')
-# print(class_names)
+print(class_names)
 plot_confusion_matrix(cm, class_names, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues)
 
-test_probs, test_preds = get_probabilities(inference_model, image_module.test_dataloader())
+# test_probs, test_preds = get_probabilities(inference_model, image_module.test_dataloader())
 # print("test_preds", test_preds.shape)
 # print("test_probs", test_probs.shape)
 # plot all the pr curves
@@ -214,15 +236,14 @@ test_probs, test_preds = get_probabilities(inference_model, image_module.test_da
 #     add_pr_curve_tensorboard(image_model.writer, i, test_probs, class_names, test_preds)
 
 # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-val_samples = next(iter(image_module.val_dataloader()))
-val_imgs, val_labels = val_samples[0], val_samples[1]
+# val_samples = next(iter(image_module.val_dataloader()))
+# val_imgs, val_labels = val_samples[0], val_samples[1]
 # print(val_imgs.shape)
 # print(val_labels.shape)
-grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
+# grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
 # write to tensorboard
-image_model.writer.add_image('prueba_hola', grid)
-image_model.writer.add_graph(inference_model, val_imgs)
-image_model.writer.close()
+# image_model.writer.add_image('prueba_hola', grid)
+# image_model.writer.add_graph(inference_model, val_imgs)
+# image_model.writer.close()
 
-
-
+# show_activations(inference_model)
