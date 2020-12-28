@@ -185,40 +185,6 @@ class ImageModel():
         print(model)
         return model
 
-    def plot_precision_recall_curve(self, recall, precision):
-        fig, ax = plt.subplots()
-        ax.step(recall, precision, color='r', alpha=0.99, where='post')
-        ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.ylim([0.0, 1.05])
-        plt.xlim([0.0, 1.0])
-        # plt.legend(loc="lower right")
-        plt.title('Precision Recall Curve')
-        fig.savefig("./stat_images/precision_recall_curve.png", format='png')
-
-    def plot_roc_curve(self, y_true, y_pred):
-        # Compute ROC curve and ROC area for each class
-        y_test = y_true
-        y_score = y_pred
-
-        fpr, tpr, thresholds = roc_curve(y_test, y_score, pos_label=2)
-        roc_auc = auc(fpr, tpr)
-
-        fig, ax = plt.figure()
-        lw = 2
-        plt.plot(fpr, tpr, color='darkorange',
-                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
-        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic example')
-        plt.legend(loc="lower right")
-        plt.show()
-        fig.savefig("./stat_images/ROC_curve.png", format='png')
-
     # TODO: método para mostrar todas las métricas ()
 
 
