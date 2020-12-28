@@ -13,7 +13,7 @@ import torchvision
 from pytorch_lightning import seed_everything, metrics
 from pytorch_lightning.metrics import classification
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from pytorch_lightning.metrics.functional import precision_recall_curve, auc
+from pytorch_lightning.metrics.functional import precision_recall_curve, auc, stat_scores, f1
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import confusion_matrix
@@ -54,6 +54,7 @@ def plot_ROC_curve(preds, targets, pos_label):
     plt.legend(loc="lower right")
     plt.show()
 
+
 @torch.no_grad()
 def evaluate(self, model, loader):
     y_true = []
@@ -77,6 +78,7 @@ def predict(model, loader):
         y_pred.extend(logits[1].detach().numpy())
         y_true.extend(labels)
     return np.array(y_true), np.array(y_pred)
+
 
 @torch.no_grad()
 def get_all_preds(model, loader):
@@ -116,6 +118,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
 
+
 @torch.no_grad()
 def get_num_correct(preds, labels):
     return preds.argmax(dim=1).eq(labels).sum().item()
@@ -141,6 +144,7 @@ def add_pr_curve_tensorboard(writer, class_index, test_probs, test_preds, classe
                         tensorboard_probs,
                         global_step=global_step)
     writer.close()
+
 
 @torch.no_grad()
 def get_probabilities(model, testloader):
@@ -175,6 +179,42 @@ def show_activations(model):
         #     print(layer)
 
 
+def plot_precision_recall_curve(recall, precision):
+    fig, ax = plt.subplots()
+    ax.plot(precision, recall, color='r', alpha=0.99)
+    # ax.fill_between(precision, recall, alpha=0.2, color='b', step='post')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    # plt.legend(loc="lower right")
+    plt.title('Precision Recall Curve')
+    fig.savefig("./stat_images/precision_recall_curve.png", format='png')
+
+# TODO: Precision_recall_curve and plot
+def get_precision_recall_curve(preds, targets):
+
+    precision, recall, _ = precision_recall_curve(preds, targets, pos_label=1)
+    return precision, recall
+# TODO: Stats_score
+def get_stats_score(preds, targets, class_index=1):
+
+    tp, fp, tn, fn, sup = stat_scores(preds, targets, class_index=1)
+    return tp, fp, tn, fn, sup
+
+# TODO: F1 Score
+def get_f1_score(preds, targets, num_classes=2):
+    f1_score = f1(preds, targets, num_classes)
+    return f1_score
+
+# TODO: Confusion matrix and plot
+def confusion_matrix():
+
+    return confusion_matrix
+
+
+
+
 # --MAIN ------------------------------------------------------------------------------------------------------
 
 # instantiate class to handle model
@@ -198,8 +238,8 @@ image_module.setup()
 inference_model = image_model.inference_model()
 print("Inference model:", inference_model)
 # print("Test Dataloader:", image_module.test_dataloader())
-y_true, y_pred = predict(inference_model, image_module.test_dataloader())
-# ("y_true", y_true)
+# y_true, y_pred = predict(inference_model, image_module.test_dataloader())
+# print("y_true", y_true)
 # print("y_pred", y_true)
 
 test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
@@ -207,26 +247,30 @@ test_preds, test_targets = get_all_preds(inference_model, image_module.test_data
 # print("Test_targets", test_targets)
 
 # Plot metrics - Precision-Recall Curve
-precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
-image_model.plot_precision_recall_curve(recall, precision)
+# precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true), pos_label=1)
+precision, recall, _ = precision_recall_curve(test_preds, test_targets, pos_label=1)
+print("Precision", precision)
+print("Recall", recall)
+plot_precision_recall_curve(recall.numpy(), precision.numpy())
 # image_model.plot_roc_curve(y_true, y_pred)
 
 # With tensors
-preds_correct1 = get_num_correct(test_preds, test_targets)
-print("--With tensors--")
-print('total correct:', preds_correct1)
-print('accuracy:', preds_correct1 / len(image_module.test_data))
+# preds_correct1 = get_num_correct(test_preds, test_targets)
+# print("--With tensors--")
+# print('total correct:', preds_correct1)
+# print('accuracy:', preds_correct1 / len(image_module.test_data))
 # # Without tensors
-preds_correct2 = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
-print("--Without tensors--")
-print('total correct:', preds_correct2)
-print('accuracy:', preds_correct2 / len(image_module.test_data))
+# preds_correct2 = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
+# print("--Without tensors--")
+# print('total correct:', preds_correct2)
+# print('accuracy:', preds_correct2 / len(image_module.test_data))
 
 # Confusion Matrix
-cm = confusion_matrix(test_targets, test_preds.argmax(dim=1))
-class_names = find_classes('./images/')
-print(class_names)
-plot_confusion_matrix(cm, class_names, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues)
+# cm = confusion_matrix(test_targets, test_preds.argmax(dim=1))
+# cm = confusion_matrix(torch.Tensor(y_true), torch.Tensor(y_pred).argmax(dim=1))
+# class_names = find_classes('./images/')
+# print(class_names)
+# plot_confusion_matrix(cm, class_names, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues)
 
 # test_probs, test_preds = get_probabilities(inference_model, image_module.test_dataloader())
 # print("test_preds", test_preds.shape)

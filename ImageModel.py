@@ -219,6 +219,9 @@ class ImageModel():
         plt.show()
         fig.savefig("./stat_images/ROC_curve.png", format='png')
 
+    # TODO: método para mostrar todas las métricas ()
+
+
 
 # --- MAIN ----
 if __name__ == '__main__':
