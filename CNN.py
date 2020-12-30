@@ -59,6 +59,7 @@ class CNN(pl.LightningModule):
         self.f1 = pytorch_lightning.metrics.F1()
         self.fb = pytorch_lightning.metrics.FBeta()
         self.cm = pytorch_lightning.metrics.ConfusionMatrix()
+        # TODO: finish adding the variables
 
         # build the model
         self.__build_model()
