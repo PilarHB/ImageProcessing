@@ -24,6 +24,7 @@ from typing import Optional
 from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning.metrics.functional import accuracy
+from pytorch_lightning.metrics import Accuracy, ConfusionMatrix
 
 from sklearn.metrics import confusion_matrix
 # from plotcm import plot_confusion_matrix
@@ -53,9 +54,14 @@ class CNN(pl.LightningModule):
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
 
-        # reference dummy image for logging graph
-        # self.reference_image=torch.rand((1,1,28,28))
+        # prepare the metrics
+        self.accuracy = pl.metrics.Accuracy()
+        self.f1 = pl.metrics.F1
+        self.fb = pl.metrics.FBeta
+        self.cm = pl.metrics.ConfusionMatrix()
 
+
+        # build the model
         self.__build_model()
 
     def __build_model(self):
@@ -97,24 +103,10 @@ class CNN(pl.LightningModule):
         t = F.log_softmax(t, dim=1)
         return features, t
 
-    def set_parameter_requires_grad(model, feature_extracting):
+    def set_parameter_requires_grad(self, model, feature_extracting):
         if feature_extracting:
             for param in model.parameters():
                 param.requires_grad = False
-
-        ## for name, child in res_mod.named_children():
-        ##    if name in ['layer3', 'layer4']:
-        ##        print(name + 'has been unfrozen.')
-        ##        for param in child.parameters():
-        ##            param.requires_grad = True
-        ##    else:
-        ##        for param in child.parameters():
-        ##            param.requires_grad = False
-
-        # also need to update optimization function
-        # only optimize those that require grad
-
-        ## optimizer_conv = torch.optim.SGD(filter(lambda x: x.requires_grad, res_mod.parameters()), lr=0.001, momentum=0.9)
 
     # returns the size of the output tensor going into the Linear layer from the conv block.
     def _get_conv_output(self, shape):
@@ -154,14 +146,13 @@ class CNN(pl.LightningModule):
         # print(train_loss)
         preds = torch.argmax(logits[1], dim=1)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
-        acc = accuracy(preds, y)
+        acc = self.accuracy(preds, y)
 
         # Logging
         self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
-        self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        self.log('train_num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
-        # 3. Outputs:
         # 3. Outputs:
         tqdm_dict = {'train_loss': train_loss}
         output = OrderedDict({'loss': train_loss,
@@ -207,17 +198,16 @@ class CNN(pl.LightningModule):
         # val_loss = self.loss(logits, y)
         val_loss = F.cross_entropy(logits[1], y)
         preds = torch.argmax(logits[1], dim=1)
-        # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
 
         self.log('val_loss', val_loss, on_step=True, on_epoch=True, logger=True)
         self.log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
-        self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        self.log('val_num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
 
         return {'val_loss': val_loss,
                 'val_acc': acc,
-                'num_correct': num_correct}
+                'val_num_correct': num_correct}
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
@@ -243,7 +233,6 @@ class CNN(pl.LightningModule):
         # test_loss = self.loss(logits, y)
         test_loss = F.cross_entropy(logits[1], y)
         preds = torch.argmax(logits[1], dim=1)
-        # num_correct = torch.sum(preds == y).float() / preds.size(0)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
 
         acc = accuracy(preds, y)

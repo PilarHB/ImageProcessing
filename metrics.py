@@ -3,6 +3,7 @@ import itertools
 import os
 import io
 from collections import Iterable
+import pathlib
 
 import torch
 import numpy as np
@@ -34,18 +35,29 @@ from ImageModel import ImageModel
 
 
 class Model_Metrics():
-    def __init__(self, preds, targets):
+    def __init__(self, preds, targets, name_model):
         super(Model_Metrics, self).__init__()
         self.preds = preds
         self.targets = targets
+        self.name_model = name_model
+        current_path = os.path.dirname(os.path.realpath(__file__))
+
+        self.CSV_PATH = os.path.join(current_path,
+                                     'models_metrics/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
+        self.METRICS_FIGURES_PATH = os.path.join(current_path, 'models_metrics/%s_metrics' % self.name_model)
+        # define the directory for the images
+        pathlib.Path(self.METRICS_FIGURES_PATH).mkdir(parents=True, exist_ok=True)
+        self.ROC_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'ROC_Curve.png')
+        self.Precision_Recall_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'Precision_Recall_Curve.png')
+        self.CM_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'Confusion_Matrix.png')
 
     # --- PLOTS ----
     # Plot ROC Curve
     # TODO: Implementar curva ROC
-    def plot_ROC_curve(self, preds, targets, pos_label):
+    def plot_ROC_curve(self, pos_label):
         # Compute ROC curve and ROC area for each class
-        y_true = targets.detach().numpy()
-        y_pred = (preds.argmax(dim=1)).detach().numpy()
+        y_true = self.targets.detach().numpy()
+        y_pred = (self.preds.argmax(dim=1)).detach().numpy()
 
         fpr, tpr, thresholds = roc_curve(y_true, y_pred, pos_label=pos_label)
         roc_auc = auc(fpr, tpr)
@@ -61,7 +73,7 @@ class Model_Metrics():
         plt.ylabel('True Positive Rate')
         plt.title('Curve ROC Label {}'.format(pos_label))
         plt.legend(loc="lower right")
-        plt.savefig('./stat_images/ROC_curve.png', format='png')
+        plt.savefig(self.ROC_PATH, format='png')
         plt.close()
         return roc_auc
 
@@ -91,7 +103,7 @@ class Model_Metrics():
         plt.tight_layout()
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
-        plt.savefig('./stat_images/confusion_matrix.png', format='png')
+        plt.savefig(self.CM_PATH, format='png')
         plt.close()
 
     # Plot Precision-Recall Curve
@@ -106,7 +118,7 @@ class Model_Metrics():
         plt.xlim([0.0, 1.0])
         # plt.legend(loc="lower right")
         plt.title('Precision Recall Curve')
-        plt.savefig('./stat_images/precision_recall_curve.png', format='png')
+        plt.savefig(self.Precision_Recall_PATH, format='png')
         plt.close()
 
     def get_num_correct(self):
@@ -114,7 +126,8 @@ class Model_Metrics():
 
     # TODO: Precision_recall_curve and plot
     def get_precision_recall_curve(self, pos_label=1, display=True):
-        precision, recall, _ = precision_recall_curve(torch.tensor(self.preds.argmax(dim=1)), torch.tensor(self.targets),
+        precision, recall, _ = precision_recall_curve(torch.tensor(self.preds.argmax(dim=1)),
+                                                      torch.tensor(self.targets),
                                                       pos_label)
         if display:
             self.plot_precision_recall_curve(recall, precision)
@@ -122,7 +135,7 @@ class Model_Metrics():
 
     # TODO: ROC Metric and ROC Curve
     def get_ROC_curve(self, pos_label=1):
-        roc_auc = self.plot_ROC_curve(self.preds, self.targets, pos_label)
+        roc_auc = self.plot_ROC_curve(pos_label)
         return roc_auc
 
     # TODO: Stats_score
@@ -144,7 +157,7 @@ class Model_Metrics():
         return cm.int()
 
     # TODO: Finish test metrics
-    def get_test_metrics(self, name_model, display=True, ):
+    def get_test_metrics(self, display=True):
         # Get Precision - Recall
         output = precision_recall(self.preds, self.targets, num_classes=2, class_reduction='none')
         precision = output[0].numpy()
@@ -170,7 +183,7 @@ class Model_Metrics():
         roc_auc_1 = self.get_ROC_curve(pos_label=1)
         # Classification Report
         report = classification_report(self.targets.detach().numpy(), (self.preds.argmax(dim=1)).detach().numpy(),
-                                       output_dict=False)
+                                       output_dict=True)
         print("Confusion Matrix")
         print(cm)
         print("Classification Report")
@@ -187,11 +200,10 @@ class Model_Metrics():
         dict = {'Metric': metric, 'Class 0': value_class0, 'Class1': value_class1}
         df = pd.DataFrame(dict)
         # dictionary of report
-        # df_report = pd.DataFrame(report)
+        df_report = pd.DataFrame(report)
         # Saving the dataframe
-        CSV_PATH = 'models_metrics/%s_metrics.csv' % name_model
-        df.to_csv(CSV_PATH, header=True, index=False)
-        # df_report.to_csv('./models_metrics/prueba.csv', mode='a', header=True, index=True)
+        df.to_csv(self.CSV_PATH, header=True, index=False)
+        df_report.to_csv(self.CSV_PATH, mode='a', header=True, index=False)
 
 
 @torch.no_grad()
@@ -313,11 +325,11 @@ if __name__ == '__main__':
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    metrics = Model_Metrics(test_preds, test_targets)
+    metrics = Model_Metrics(test_preds, test_targets, name_model)
     preds_correct = metrics.get_num_correct()
     print('total correct:', preds_correct)
-    print('accuracy:', preds_correct/ len(image_module.test_data))
-    metrics.get_test_metrics(name_model, display=True)
+    print('accuracy:', preds_correct / len(image_module.test_data))
+    metrics.get_test_metrics(display=True)
 
     # # Without tensors
     # preds_correct = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
