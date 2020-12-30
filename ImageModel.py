@@ -150,8 +150,9 @@ class ImageModel():
     @torch.no_grad()
     def inference_model(self):
         best_model = self.load_best_model()
+        # print(best_model)
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
-        return inference_model
+        return best_model, inference_model
 
     # TODO: Revisar este método, creo que no es necesario
     def evaluate_model(self):
@@ -227,15 +228,5 @@ if __name__ == '__main__':
     # inference_model = image_model.inference_model()
     # y_true, y_pred = image_model.evaluate_model()
 
-    # Generate binary correctness labels across classes
-    # binary_ground_truth = label_binarize(y_true,
-    #                                     classes=np.arange(0, 1).tolist())
-    # print("binary_ground_truth", binary_ground_truth)
 
-    # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
-    # precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
 
-    # Plot metrics - Precision-Recall Curve
-    # image_model.plot_precision_recall_curve(recall, precision)
-    # Plot metrics - ROC Curve
-    # plot_roc_curve(y_true, y_pred)
