@@ -24,7 +24,7 @@ from typing import Optional
 from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader, random_split
 from pytorch_lightning.metrics.functional import accuracy
-from pytorch_lightning.metrics import Accuracy, ConfusionMatrix
+import pytorch_lightning.metrics
 
 from sklearn.metrics import confusion_matrix
 # from plotcm import plot_confusion_matrix
@@ -55,11 +55,10 @@ class CNN(pl.LightningModule):
         self.num_workers = num_workers
 
         # prepare the metrics
-        self.accuracy = pl.metrics.Accuracy()
-        self.f1 = pl.metrics.F1
-        self.fb = pl.metrics.FBeta
-        self.cm = pl.metrics.ConfusionMatrix()
-
+        self.accuracy = pytorch_lightning.metrics.Accuracy()
+        self.f1 = pytorch_lightning.metrics.F1()
+        self.fb = pytorch_lightning.metrics.FBeta()
+        self.cm = pytorch_lightning.metrics.ConfusionMatrix()
 
         # build the model
         self.__build_model()
