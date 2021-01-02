@@ -25,11 +25,12 @@ from pytorch_lightning import Trainer, seed_everything
 
 class MyImageModule(pl.LightningDataModule):
 
-    def __init__(self, batch_size):
+    def __init__(self, batch_size, dataset_size=None):
         super().__init__()
         self.trains_dims = None
         self.batch_size = batch_size
         self.data_dir = './images/'
+        self.dataset_size = dataset_size
 
     # def prepare_data(self):
 
@@ -58,9 +59,14 @@ class MyImageModule(pl.LightningDataModule):
 
         # Build Dataset
         dataset = datasets.ImageFolder(self.data_dir)
+        # Shuffle the samples
+        samples = dataset.samples.copy()
+        random.shuffle(samples)
+        # Take a subset of the samples
+        dataset.samples = samples[:self.dataset_size] if self.dataset_size is not None else samples
         train_size = int(0.7 * len(dataset))
         val_size = int(0.5 * (len(dataset) - train_size))
-        test_size = int(len(dataset) - train_size -val_size)
+        test_size = int(len(dataset) - train_size - val_size)
         # test_size = len(dataset) - train_size - val_size
         # train_data = datasets.ImageFolder(self.train_dir, transform=transform)
         self.train_data, self.val_data, self.test_data = random_split(dataset, [train_size, val_size, test_size])

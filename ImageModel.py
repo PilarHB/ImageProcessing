@@ -48,7 +48,7 @@ class ImageModel():
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
-        self.image_module = MyImageModule(batch_size=self.batch_size)
+        self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
         # self.image_module = MyImageModule(batch_size=self.batch_size)
         self.activation = {}
         self.writer = SummaryWriter('tb_logs')
@@ -101,7 +101,8 @@ class ImageModel():
 
         trainer.fit(model=self.model, datamodule=self.image_module)
         # Test  ################################################
-        trainer.test()
+        trainer.test(datamodule=self.image_module)
+        # self.save_graph_logger(self.model)
 
     def evaluate(self, model, loader):
         y_true = []
@@ -186,9 +187,17 @@ class ImageModel():
         print(model)
         return model
 
-    # TODO: método para mostrar todas las métricas ()
-
-
+    # TODO: save model graph after trainning
+    def save_graph_logger(self, model):
+        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        val_samples = next(iter(self.image_module.val_dataloader()))
+        # print(val_samples)
+        val_imgs, val_labels = val_samples[0], val_samples[1]
+        grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
+        # write to tensorboard
+        self.writer.add_image('Graph Model', grid)
+        self.writer.add_graph(model, val_imgs)
+        self.writer.close()
 
 # --- MAIN ----
 if __name__ == '__main__':

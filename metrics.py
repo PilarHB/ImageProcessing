@@ -304,14 +304,14 @@ if __name__ == '__main__':
     image_model = ImageModel()
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
     # Initialize Image Module
-    image_module = MyImageModule(batch_size=32)
-    image_module.setup()
+    # image_module = MyImageModule(batch_size=32)
+    # image_module.setup()
     # If we want to train the model, we call the trainer
-    # image_model.call_trainer()
+    image_model.call_trainer()
 
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
-    name_model, inference_model = image_model.inference_model()
+    # name_model, inference_model = image_model.inference_model()
     # print("Inference model:", inference_model)
 
     # Prediction with no tensors
@@ -320,16 +320,16 @@ if __name__ == '__main__':
     # print("y_pred", y_true)
 
     # Predictions with tensors
-    test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
+    # test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
     # print("Test preds:", test_preds)
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    metrics = Model_Metrics(test_preds, test_targets, name_model)
-    preds_correct = metrics.get_num_correct()
-    print('total correct:', preds_correct)
-    print('accuracy:', preds_correct / len(image_module.test_data))
-    metrics.get_test_metrics(display=True)
+    # metrics = Model_Metrics(test_preds, test_targets, name_model)
+    # preds_correct = metrics.get_num_correct()
+    # print('total correct:', preds_correct)
+    # print('accuracy:', preds_correct / len(image_module.test_data))
+    # metrics.get_test_metrics(display=True)
 
     # # Without tensors
     # preds_correct = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
