@@ -84,7 +84,7 @@ class ImageModel():
         # print(val_labels.shape)
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
         # write to tensorboard
-        self.logger.add_image('prueba', grid)
+        self.logger.experiment.add_image('prueba', grid)
         self.logger.close()
 
         # Load callbacks ########################################
@@ -191,8 +191,8 @@ class ImageModel():
         val_imgs, val_labels = val_samples[0], val_samples[1]
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
         # write to tensorboard
-        self.logger.add_image('Graph Model', grid)
-        self.logger.add_graph(model, val_imgs)
+        self.logger.experiment.add_image('Graph Model', grid)
+        self.logger.experiment.add_graph(model, val_imgs)
         self.logger.close()
 
 # --- MAIN ----

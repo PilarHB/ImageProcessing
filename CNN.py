@@ -7,25 +7,110 @@ import pandas as pd
 from PIL import Image
 from collections import OrderedDict, Iterable
 import os
-
-import torchvision
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+from typing import Generator
 import torch
 import torch.nn as nn
 from torch.nn import Module
-import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
 from typing import Optional
-
 from torch.optim import lr_scheduler
+from torch.optim.optimizer import Optimizer
 from pytorch_lightning.metrics.functional import accuracy, auroc, precision, recall, confusion_matrix, f1, fbeta
 import pytorch_lightning.metrics
+BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
 
+# --- UTILITY FUNCTIONS ----
+# Extract from :
+# https://github.com/PyTorchLightning/pytorch-lightning/blob/master/pl_examples/domain_templates/computer_vision_fine_tuning.py
+
+def _make_trainable(module: Module) -> None:
+    """Unfreezes a given module.
+    Args:
+        module: The module to unfreeze
+    """
+    for param in module.parameters():
+        param.requires_grad = True
+    module.train()
+
+
+def freeze(module: Module,
+           n: Optional[int] = None,
+           train_bn: bool = True) -> None:
+    """Freezes the layers up to index n (if n is not None).
+    Args:
+        module: The module to freeze (at least partially)
+        n: Max depth at which we stop freezing the layers. If None, all
+            the layers of the given module will be frozen.
+        train_bn: If True, leave the BatchNorm layers in training mode
+    """
+    children = list(module.children())
+    n_max = len(children) if n is None else int(n)
+
+    for child in children[:n_max]:
+        _recursive_freeze(module=child, train_bn=train_bn)
+
+    for child in children[n_max:]:
+        _make_trainable(module=child)
+
+def _recursive_freeze(module: Module,
+                      train_bn: bool = True) -> None:
+    """Freezes the layers of a given module.
+    Args:
+        module: The module to freeze
+        train_bn: If True, leave the BatchNorm layers in training mode
+    """
+    children = list(module.children())
+    if not children:
+        if not (isinstance(module, BN_TYPES) and train_bn):
+            for param in module.parameters():
+                param.requires_grad = False
+            module.eval()
+        else:
+            # Make the BN layers trainable
+            _make_trainable(module)
+    else:
+        for child in children:
+            _recursive_freeze(module=child, train_bn=train_bn)
+
+def filter_params(module: Module,
+                  train_bn: bool = True) -> Generator:
+    """Yields the trainable parameters of a given module.
+    Args:
+        module: A given module
+        train_bn: If True, leave the BatchNorm layers in training mode
+    Returns:
+        Generator
+    """
+    children = list(module.children())
+    if not children:
+        if not (isinstance(module, BN_TYPES) and train_bn):
+            for param in module.parameters():
+                if param.requires_grad:
+                    yield param
+    else:
+        for child in children:
+            for param in filter_params(module=child, train_bn=train_bn):
+                yield param
+
+
+def _unfreeze_and_add_param_group(module: Module,
+                                  optimizer: Optimizer,
+                                  lr: Optional[float] = None,
+                                  train_bn: bool = True):
+    """Unfreezes a module and adds its parameters to an optimizer."""
+    _make_trainable(module)
+    params_lr = optimizer.param_groups[0]['lr'] if lr is None else float(lr)
+    optimizer.add_param_group(
+        {'params': filter_params(module=module, train_bn=train_bn),
+         'lr': params_lr / 10.,
+         })
+
+
+# --- PYTORCH LIGHTNING MODULE ----
 class CNN(pl.LightningModule):
 
     # defines the network
@@ -40,6 +125,7 @@ class CNN(pl.LightningModule):
                  num_workers: int = 6):
         super(CNN, self).__init__()
         # parameters
+        self.save_hyperparameters()
         self.dim = input_shape
         self.backbone = backbone
         self.train_bn = train_bn
@@ -57,26 +143,38 @@ class CNN(pl.LightningModule):
 
         # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
-        # backbone = model_func(pretrained=True)
-        self.feature_extractor = model_func(pretrained=True)
-
-        _layers = list(self.feature_extractor.children())[:-1]
-        # print(_layers)
-        # self.feature_extractor = torch.nn.Sequential(*_layers)
+        backbone = model_func(pretrained=True)
+        # self.feature_extractor = model_func(pretrained=True)
+        print("##### ENTERO ########")
+        _layers = list(backbone.children())
+        print(_layers)
+        print("##### CON MENOS 1 ########")
+        _layers = list(backbone.children())[:-1]
+        print(_layers)
+        self.feature_extractor = torch.nn.Sequential(*_layers)
+        # print(self.feature_extractor)
+        # If.eval() is used, then the layers are frozen.
+        # self.feature_extractor.eval()
+        freeze(module=self.feature_extractor, train_bn=self.train_bn)
 
         # 2. Classifier:
-        # If.eval() is used, then the layers are frozen.
-        self.feature_extractor.eval()
+        # _fc_layers = [torch.nn.Linear(2048, 256),
+        #               torch.nn.Linear(256, 32),
+        #               torch.nn.Linear(32, 1)]
+        # self.fc = torch.nn.Sequential(*_fc_layers)
 
-        # 3. Loss:
-        # self.loss_func = F.cross_entropy
+        self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.feature_extractor.add_module("(2)", self.adaptive_layer)
+        print(self.feature_extractor)
 
-        # PyTorch uses NCHW
         # classes are two: success or failure
         num_target_classes = 2
         n_sizes = self._get_conv_output(self.dim)
-        # self.feature_extractor.classifier[6] = nn.Linear(in_features=self.feature_extractor.classifier[6].in_features, out_features=2)
-        self.fc = nn.Linear(n_sizes, num_target_classes)
+        _fc_layers = [nn.Linear(n_sizes, num_target_classes)]
+        self.fc = torch.nn.Sequential(*_fc_layers)
+
+        # 3. Loss:
+        # self.loss_func = F.cross_entropy
 
     # mandatory
     def forward(self, t):
@@ -84,7 +182,9 @@ class CNN(pl.LightningModule):
         """Forward pass. Returns logits."""
         # 1. Feature extraction:
         t = self.feature_extractor(t)
+        print("t:", t.size())
         features = t.squeeze(-1).squeeze(-1)
+        print("Features", features.size())
         # 2. Classifier (returns logits):
         t = self.fc(features)
         # We want the probability to sum 1
@@ -103,7 +203,7 @@ class CNN(pl.LightningModule):
 
         output_feat = self._forward_features(input)
         print("output_feat")
-        # print(output_feat)
+        print(output_feat.size())
         n_size = output_feat.data.view(batch_size, -1).size(1)
         print("n_size")
         print(n_size)
@@ -116,6 +216,7 @@ class CNN(pl.LightningModule):
     # returns the feature tensor from the conv block
     def _forward_features(self, x):
         x = self.feature_extractor(x)
+        print("Size last_layer", x.size())
         return x
 
     # loss function
@@ -131,7 +232,6 @@ class CNN(pl.LightningModule):
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
 
-
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
         self._calculate_epoch_metrics(outputs, name='Train')
@@ -146,7 +246,6 @@ class CNN(pl.LightningModule):
         outputs = self._calculate_step_metrics(logits, y)
         self.log("val_loss", outputs["loss"])
         return outputs
-
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
