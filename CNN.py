@@ -22,7 +22,7 @@ import torchvision.models as models
 from typing import Optional
 
 from torch.optim import lr_scheduler
-from pytorch_lightning.metrics.functional import accuracy, auroc
+from pytorch_lightning.metrics.functional import accuracy, auroc, precision, recall, confusion_matrix, f1, fbeta
 import pytorch_lightning.metrics
 
 
@@ -48,17 +48,6 @@ class CNN(pl.LightningModule):
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
-
-        # prepare the metrics
-        self.accuracy = pl.metrics.Accuracy()
-        self.f1 = pl.metrics.F1(average='weighted')
-        self.fb05 = pl.metrics.FBeta(num_classes=2, average='weighted', beta=0.5)
-        self.fb2 = pl.metrics.FBeta(num_classes=2, average='weighted', beta=2)
-
-        self.cm = pl.metrics.ConfusionMatrix(num_classes=2)
-        self.prec = pl.metrics.Precision(num_classes=2, average='micro')
-        self.recall = pl.metrics.Recall(num_classes=2, average='micro')
-        # self.auroc = pl.metrics.ROC()
 
         # build the model
         self.__build_model()
@@ -139,247 +128,40 @@ class CNN(pl.LightningModule):
         x, y = batch
         logits = self(x)
 
-        # 2. Compute loss & accuracy:
-        train_loss = F.cross_entropy(logits[1], y)
-        # train_loss = self.loss(logits[1], y)
-        # print(train_loss)
-        preds = torch.argmax(logits[1], dim=1)
-        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
-        acc = self.accuracy(preds, y)
-        f1_score = self.f1(preds, y)
-        f05_score = self.fb05(preds, y)
-        f2_score = self.fb2(preds, y)
-        precision = self.prec(preds, y)
-        recall = self.recall(preds, y)
-
-        # Logging
-        # self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
-        # self.log('train_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('train_num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
-        # self.log('train_f1_score', f1_score, on_step=True, on_epoch=True, logger=True)
-
-        return {'loss': train_loss,
-                'acc': acc,
-                'f1_score': f1_score,
-                'f05_score': f05_score,
-                'f2_score': f2_score,
-                'precision': precision,
-                'recall': recall,
-                'num_correct': num_correct}
+        # 2. Compute loss & metrics:
+        return self._calculate_step_metrics(logits, y)
 
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
-
-        # Logging activations
-        train_loss_mean = torch.stack([output['loss']
-                                       for output in outputs]).mean()
-        train_acc_mean = torch.stack([output['num_correct']
-                                      for output in outputs]).sum().float()
-        train_acc_mean /= (len(outputs) * self.batch_size)
-
-        train_f1_score = torch.stack([output['f1_score']
-                                     for output in outputs]).mean()
-
-        train_f05_score = torch.stack([output['f05_score']
-                                      for output in outputs]).mean()
-        train_f2_score = torch.stack([output['f2_score']
-                                     for output in outputs]).mean()
-        train_precision = torch.stack([output['precision']
-                                      for output in outputs]).mean()
-        train_recall = torch.stack([output['recall']
-                                      for output in outputs]).mean()
-
-
-
-        # Logging scalars
-        self.logger.experiment.add_scalar('Loss/Train',
-                                          train_loss_mean,
-                                          self.current_epoch)
-
-        self.logger.experiment.add_scalar('Accuracy/Train',
-                                          train_acc_mean,
-                                          self.current_epoch)
-
-        self.logger.experiment.add_scalar('F1_Score/Train',
-                                          train_f1_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F05_Score/Train',
-                                          train_f05_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F2_Score/Train',
-                                          train_f2_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Precision/Train',
-                                          train_precision,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Recall/Train',
-                                          train_recall,
-                                          self.current_epoch)
-        # Logging histograms
-        self.custom_histogram_adder()
-
-
-    # If you need to do something with all the outputs of each training_step
+        self._calculate_epoch_metrics(outputs, name='Train')
 
     # validation loop
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
 
-        # 2. Compute loss & accuracy:
-        # val_loss = self.loss(logits, y)
-        val_loss = F.cross_entropy(logits[1], y)
-        preds = torch.argmax(logits[1], dim=1)
-        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
-        acc = accuracy(preds, y)
-        f1_score = self.f1(preds, y)
-        f05_score = self.fb05(preds, y)
-        f2_score = self.fb2(preds, y)
-        precision = self.prec(preds, y)
-        recall = self.recall(preds, y)
+        # 2. Compute loss & metrics:
 
-        self.log('val_loss', val_loss)
-        # .log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('val_num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
+        outputs = self._calculate_step_metrics(logits, y)
+        self.log("val_loss", outputs["loss"])
+        return outputs
 
-        # logs = {'val_loss': val_loss}
-        return {'loss': val_loss,
-                'acc': acc,
-                'f1_score': f1_score,
-                'f05_score': f05_score,
-                'f2_score': f2_score,
-                'precision': precision,
-                'recall': recall,
-                'num_correct': num_correct}
-                # 'log': logs}
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
-
-        val_loss_mean = torch.stack([output['loss']
-                                     for output in outputs]).mean()
-        val_acc_mean = torch.stack([output['num_correct']
-                                    for output in outputs]).sum().float()
-        val_acc_mean /= (len(outputs) * self.batch_size)
-
-        val_f1_score = torch.stack([output['f1_score']
-                                    for output in outputs]).mean()
-        val_f05_score = torch.stack([output['f05_score']
-                                      for output in outputs]).mean()
-        val_f2_score = torch.stack([output['f2_score']
-                                     for output in outputs]).mean()
-        val_precision = torch.stack([output['precision']
-                                      for output in outputs]).mean()
-        val_recall = torch.stack([output['recall']
-                                      for output in outputs]).mean()
-
-        # Adding logs to TensorBoard
-        self.logger.experiment.add_scalar("Loss/Val",
-                                          val_loss_mean,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar("Accuracy/Val",
-                                          val_acc_mean,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F1_Score/Val',
-                                          val_f1_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F05_Score/Val',
-                                          val_f05_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F2_Score/Val',
-                                          val_f2_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Precision/Val',
-                                          val_precision,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Recall/Val',
-                                          val_recall,
-                                          self.current_epoch)
-
-        # tensorboard_logs = {'val_loss': val_loss_mean,
-        #                     "val_accuracy": val_acc_mean,
-        #                     "val_f1_score": val_f1_score}
-        # return {'val_loss': val_loss_mean, 'log': tensorboard_logs}
+        self._calculate_epoch_metrics(outputs, name='Val')
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
 
-        # 2. Compute loss & accuracy:
-        # test_loss = self.loss(logits, y)
-        test_loss = F.cross_entropy(logits[1], y)
-        preds = torch.argmax(logits[1], dim=1)
-        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
-        f1_score = self.f1(preds, y)
-        acc = accuracy(preds, y)
-        f05_score = self.fb05(preds, y)
-        f2_score = self.fb2(preds, y)
-        precision = self.prec(preds, y)
-        recall = self.recall(preds, y)
-
-        # self.log('test_loss', test_loss, on_step=True, on_epoch=True, logger=True)
-        # self.log('test_acc', acc, on_step=True, on_epoch=True, logger=True)
-        # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
-
-        logs = {'test_loss': test_loss}
-        return {'loss': test_loss,
-                'num_correct': num_correct,
-                'f1_score': f1_score,
-                'f05_score': f05_score,
-                'f2_score': f2_score,
-                'precision': precision,
-                'recall': recall,
-                'log': logs,
-                'progress_bar': logs}
+        # 2. Compute loss & metrics:
+        return self._calculate_step_metrics(logits, y)
 
     def test_epoch_end(self, outputs):
-        # OPTIONAL
-        # The code that runs as a validation epoch finished
-        # Used for metric evaluation
-        test_loss_mean = torch.stack([output['loss']
-                                      for output in outputs]).mean()
-        test_acc_mean = torch.stack([output['num_correct']
-                                     for output in outputs]).sum().float()
-        test_acc_mean /= (len(outputs) * self.batch_size)
-        test_f1_score = torch.stack([output['f1_score']
-                                     for output in outputs]).mean()
-        test_f05_score = torch.stack([output['f05_score']
-                                      for output in outputs]).mean()
-        test_f2_score = torch.stack([output['f2_score']
-                                     for output in outputs]).mean()
-        test_precision = torch.stack([output['precision']
-                                      for output in outputs]).mean()
-        test_recall = torch.stack([output['recall']
-                                      for output in outputs]).mean()
 
-        # Logging Data to TensorBoard
-        self.logger.experiment.add_scalar("Loss/Test",
-                                          test_loss_mean,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar("Accuracy/Test",
-                                          test_acc_mean,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F1_Score/Test',
-                                          test_f1_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F05_Score/Test',
-                                          test_f05_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('F2_Score/Test',
-                                          test_f2_score,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Precision/Test',
-                                          test_precision,
-                                          self.current_epoch)
-        self.logger.experiment.add_scalar('Recall/Test',
-                                          test_recall,
-                                          self.current_epoch)
-
-        # tensorboard_logs = {'test_loss': test_loss_mean,
-        #                     "test_accuracy": test_acc_mean,
-        #                     "test_f1_score": test_f1_score}
-        # return {'test_loss': test_loss_mean, 'log': tensorboard_logs}
+        self._calculate_epoch_metrics(outputs, name='Test')
 
     # define optimizers
     def configure_optimizers(self):
@@ -402,10 +184,73 @@ class CNN(pl.LightningModule):
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
 
     # TODO: Refactor internal metrics
-    # def _calculate_step_metrics(self):
-    #
-    #     return
-    #
-    # def _calculate_epoch_metrics(self):
-    #
-    #     return
+    def _calculate_step_metrics(self, logits, y):
+        # prepare the metrics
+        loss = F.cross_entropy(logits[1], y)
+        # train_loss = self.loss(logits[1], y)
+        preds = torch.argmax(logits[1], dim=1)
+        num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
+        acc = accuracy(preds, y)
+        f1_score = f1(preds, y, num_classes=2, average='weighted')
+        fb05_score = fbeta(preds, y, num_classes=2, average='weighted', beta=0.5)
+        fb2_score = fbeta(preds, y, num_classes=2, average='weighted', beta=2)
+        cm = confusion_matrix(preds, y, num_classes=2)
+        prec = precision(preds, y, num_classes=2, class_reduction='weighted')
+        rec = recall(preds, y, num_classes=2, class_reduction='weighted')
+        # au_roc = auroc(preds, y, pos_label=1)
+
+        return {'loss': loss,
+                'acc': acc,
+                'f1_score': f1_score,
+                'f05_score': fb05_score,
+                'f2_score': fb2_score,
+                'precision': prec,
+                'recall': rec,
+                # 'auroc': au_roc,
+                'confusion_matrix': cm,
+                'num_correct': num_correct}
+
+    def _calculate_epoch_metrics(self, outputs, name):
+
+        # Logging activations
+        loss_mean = torch.stack([output['loss']
+                                 for output in outputs]).mean()
+        acc_mean = torch.stack([output['num_correct']
+                                for output in outputs]).sum().float()
+        acc_mean /= (len(outputs) * self.batch_size)
+
+        f1_score = torch.stack([output['f1_score']
+                                for output in outputs]).mean()
+
+        f05_score = torch.stack([output['f05_score']
+                                 for output in outputs]).mean()
+        f2_score = torch.stack([output['f2_score']
+                                for output in outputs]).mean()
+        precision = torch.stack([output['precision']
+                                 for output in outputs]).mean()
+        recall = torch.stack([output['recall']
+                              for output in outputs]).mean()
+        # Logging scalars
+        self.logger.experiment.add_scalar(f'Loss/{name}',
+                                          loss_mean,
+                                          self.current_epoch)
+
+        self.logger.experiment.add_scalar(f'Accuracy/{name}',
+                                          acc_mean,
+                                          self.current_epoch)
+
+        self.logger.experiment.add_scalar(f'F1_Score/{name}',
+                                          f1_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar(f'F05_Score/{name}',
+                                          f05_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar(f'F2_Score/{name}',
+                                          f2_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar(f'Precision/{name}',
+                                          precision,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar(f'Recall/{name}',
+                                          recall,
+                                          self.current_epoch)

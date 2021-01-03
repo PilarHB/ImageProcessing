@@ -2,6 +2,8 @@
 
 import math
 import random
+from copy import copy
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -19,7 +21,7 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchvision.models as models
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, random_split, SubsetRandomSampler, Subset
 from pytorch_lightning import Trainer, seed_everything
 
 
@@ -42,36 +44,45 @@ class MyImageModule(pl.LightningDataModule):
         self.transform = transforms.Compose([
             # you can add other transformations in this list
             # transforms.Grayscale(num_output_channels=1),
-            transforms.Resize(size=256),
             transforms.CenterCrop(size=224),
+            transforms.Resize(size=256),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
         self.augmentation = transforms.Compose([
+            transforms.CenterCrop(size=224),
             transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
             transforms.RandomRotation(degrees=15),
             transforms.RandomHorizontalFlip(),
-            transforms.CenterCrop(size=224),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
         # Build Dataset
         dataset = datasets.ImageFolder(self.data_dir)
-
+        # Select a subset of the images
+        indices = list(range(len(dataset)))
         dataset_size = len(dataset) if self.dataset_size is None else min(len(dataset), self.dataset_size)
-        train_size = int(0.7 * dataset_size)
-        val_size = int(0.5 * (dataset_size - train_size))
-        test_size = int(dataset_size - train_size - val_size)
-        # test_size = len(dataset) - train_size - val_size
-        # train_data = datasets.ImageFolder(self.train_dir, transform=transform)
-        self.train_data, self.val_data, self.test_data = random_split(dataset,
+        samples = list(SubsetRandomSampler(indices, generator=torch.Generator().manual_seed(42)))[:dataset_size]
+        subset = Subset(dataset, indices=samples)
+        train_size = int(0.7 * len(subset))
+        val_size = int(0.5 * (len(subset) - train_size))
+        test_size = int(len(subset) - train_size - val_size)
+
+        self.train_data, self.val_data, self.test_data = random_split(subset,
                                                                       [train_size, val_size, test_size],
                                                                       generator=torch.Generator().manual_seed(42))
+        print(type(self.val_data))
         print("Len Train Data", len(self.train_data))
         print("Len Val Data", len(self.val_data))
         print("Len Test Data", len(self.test_data))
+
+        # Esto es una guarrada : https://stackoverflow.com/questions/51782021/how-to-use-different-data-augmentation-for-subsets-in-pytorch
+        self.train_data.dataset = copy(dataset)
+        self.val_data.dataset = copy(dataset)
+        self.test_data.dataset = copy(dataset)
+
         # Data Augmentation for Training
         self.train_data.dataset.transform = self.augmentation
         # Transform Data

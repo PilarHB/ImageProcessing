@@ -51,7 +51,9 @@ class ImageModel():
         self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
         # self.image_module = MyImageModule(batch_size=self.batch_size)
         self.activation = {}
-        self.writer = SummaryWriter('tb_logs')
+        # Tensorboard Logger used
+        self.logger = TensorBoardLogger('tb_logs', name='my_model')
+
 
     def config_callbacks(self):
         # Checkpoint  ################################################
@@ -82,20 +84,16 @@ class ImageModel():
         # print(val_labels.shape)
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
         # write to tensorboard
-        self.writer.add_image('prueba', grid)
-        self.writer.close()
+        self.logger.add_image('prueba', grid)
+        self.logger.close()
 
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self.config_callbacks()
 
-        # Logger ################################################
-        # Tensorboard Logger used
-        logger = TensorBoardLogger('tb_logs', name='my_model')
-
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
                              gpus=1,
-                             logger=logger,
+                             logger=self.logger,
                              deterministic=True,
                              callbacks=[early_stop_callback, checkpoint_callback])
 
@@ -193,9 +191,9 @@ class ImageModel():
         val_imgs, val_labels = val_samples[0], val_samples[1]
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
         # write to tensorboard
-        self.writer.add_image('Graph Model', grid)
-        self.writer.add_graph(model, val_imgs)
-        self.writer.close()
+        self.logger.add_image('Graph Model', grid)
+        self.logger.add_graph(model, val_imgs)
+        self.logger.close()
 
 # --- MAIN ----
 if __name__ == '__main__':
