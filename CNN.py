@@ -22,7 +22,7 @@ import torchvision.models as models
 from typing import Optional
 
 from torch.optim import lr_scheduler
-from pytorch_lightning.metrics.functional import accuracy
+from pytorch_lightning.metrics.functional import accuracy, auroc
 import pytorch_lightning.metrics
 
 
@@ -50,14 +50,15 @@ class CNN(pl.LightningModule):
         self.num_workers = num_workers
 
         # prepare the metrics
-        self.accuracy = pytorch_lightning.metrics.Accuracy()
-        self.f1 = pytorch_lightning.metrics.F1(average='weighted')
-        self.fb = pytorch_lightning.metrics.FBeta(num_classes=2, average='weighted', beta=0.5)
-        self.cm = pytorch_lightning.metrics.ConfusionMatrix(num_classes=2)
-        self.prec = pytorch_lightning.metrics.Precision()
-        self.recall = pytorch_lightning.metrics.Recall()
-        self.precision_recall_curve = pytorch_lightning.metrics.PrecisionRecallCurve()
-        self.roc = pytorch_lightning.metrics.ROC()
+        self.accuracy = pl.metrics.Accuracy()
+        self.f1 = pl.metrics.F1(average='weighted')
+        self.fb05 = pl.metrics.FBeta(num_classes=2, average='weighted', beta=0.5)
+        self.fb2 = pl.metrics.FBeta(num_classes=2, average='weighted', beta=2)
+
+        self.cm = pl.metrics.ConfusionMatrix(num_classes=2)
+        self.prec = pl.metrics.Precision(num_classes=2, average='micro')
+        self.recall = pl.metrics.Recall(num_classes=2, average='micro')
+        # self.auroc = pl.metrics.ROC()
 
         # build the model
         self.__build_model()
@@ -146,9 +147,10 @@ class CNN(pl.LightningModule):
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = self.accuracy(preds, y)
         f1_score = self.f1(preds, y)
-        # print("Resultado de la f1", f1_score)
-        # f05_score = self.fb(preds, y, num_classes=2, )
-        # f2_score = self.fb(preds, y, num_classes=2, average='none', beta=2)
+        f05_score = self.fb05(preds, y)
+        f2_score = self.fb2(preds, y)
+        precision = self.prec(preds, y)
+        recall = self.recall(preds, y)
 
         # Logging
         # self.log('train_loss', train_loss, on_step=True, on_epoch=True, logger=True)
@@ -156,20 +158,15 @@ class CNN(pl.LightningModule):
         # self.log('train_num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
         # self.log('train_f1_score', f1_score, on_step=True, on_epoch=True, logger=True)
 
-        # 3. Outputs:
-        # tqdm_dict = {'train_loss': train_loss}
-        # output = OrderedDict({'loss': train_loss,
-        #                       'num_correct': num_correct,
-        #                       # 'f1_score': f1_score,
-        #                       'log': tqdm_dict,
-        #                       'progress_bar': tqdm_dict})
-        # return output
-        # logs = {'train_loss': train_loss}
         return {'loss': train_loss,
                 'acc': acc,
                 'f1_score': f1_score,
+                'f05_score': f05_score,
+                'f2_score': f2_score,
+                'precision': precision,
+                'recall': recall,
                 'num_correct': num_correct}
-                 # 'log': logs}
+
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
@@ -184,6 +181,17 @@ class CNN(pl.LightningModule):
         train_f1_score = torch.stack([output['f1_score']
                                      for output in outputs]).mean()
 
+        train_f05_score = torch.stack([output['f05_score']
+                                      for output in outputs]).mean()
+        train_f2_score = torch.stack([output['f2_score']
+                                     for output in outputs]).mean()
+        train_precision = torch.stack([output['precision']
+                                      for output in outputs]).mean()
+        train_recall = torch.stack([output['recall']
+                                      for output in outputs]).mean()
+
+
+
         # Logging scalars
         self.logger.experiment.add_scalar('Loss/Train',
                                           train_loss_mean,
@@ -195,6 +203,18 @@ class CNN(pl.LightningModule):
 
         self.logger.experiment.add_scalar('F1_Score/Train',
                                           train_f1_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F05_Score/Train',
+                                          train_f05_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F2_Score/Train',
+                                          train_f2_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Precision/Train',
+                                          train_precision,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Recall/Train',
+                                          train_recall,
                                           self.current_epoch)
         # Logging histograms
         self.custom_histogram_adder()
@@ -214,6 +234,10 @@ class CNN(pl.LightningModule):
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
         f1_score = self.f1(preds, y)
+        f05_score = self.fb05(preds, y)
+        f2_score = self.fb2(preds, y)
+        precision = self.prec(preds, y)
+        recall = self.recall(preds, y)
 
         self.log('val_loss', val_loss)
         # .log('val_acc', acc, on_step=True, on_epoch=True, logger=True)
@@ -223,6 +247,10 @@ class CNN(pl.LightningModule):
         return {'loss': val_loss,
                 'acc': acc,
                 'f1_score': f1_score,
+                'f05_score': f05_score,
+                'f2_score': f2_score,
+                'precision': precision,
+                'recall': recall,
                 'num_correct': num_correct}
                 # 'log': logs}
 
@@ -237,6 +265,14 @@ class CNN(pl.LightningModule):
 
         val_f1_score = torch.stack([output['f1_score']
                                     for output in outputs]).mean()
+        val_f05_score = torch.stack([output['f05_score']
+                                      for output in outputs]).mean()
+        val_f2_score = torch.stack([output['f2_score']
+                                     for output in outputs]).mean()
+        val_precision = torch.stack([output['precision']
+                                      for output in outputs]).mean()
+        val_recall = torch.stack([output['recall']
+                                      for output in outputs]).mean()
 
         # Adding logs to TensorBoard
         self.logger.experiment.add_scalar("Loss/Val",
@@ -247,6 +283,18 @@ class CNN(pl.LightningModule):
                                           self.current_epoch)
         self.logger.experiment.add_scalar('F1_Score/Val',
                                           val_f1_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F05_Score/Val',
+                                          val_f05_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F2_Score/Val',
+                                          val_f2_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Precision/Val',
+                                          val_precision,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Recall/Val',
+                                          val_recall,
                                           self.current_epoch)
 
         # tensorboard_logs = {'val_loss': val_loss_mean,
@@ -265,6 +313,11 @@ class CNN(pl.LightningModule):
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         f1_score = self.f1(preds, y)
         acc = accuracy(preds, y)
+        f05_score = self.fb05(preds, y)
+        f2_score = self.fb2(preds, y)
+        precision = self.prec(preds, y)
+        recall = self.recall(preds, y)
+
         # self.log('test_loss', test_loss, on_step=True, on_epoch=True, logger=True)
         # self.log('test_acc', acc, on_step=True, on_epoch=True, logger=True)
         # self.log('num_correct', num_correct, on_step=True, on_epoch=True, logger=True)
@@ -273,6 +326,10 @@ class CNN(pl.LightningModule):
         return {'loss': test_loss,
                 'num_correct': num_correct,
                 'f1_score': f1_score,
+                'f05_score': f05_score,
+                'f2_score': f2_score,
+                'precision': precision,
+                'recall': recall,
                 'log': logs,
                 'progress_bar': logs}
 
@@ -287,6 +344,14 @@ class CNN(pl.LightningModule):
         test_acc_mean /= (len(outputs) * self.batch_size)
         test_f1_score = torch.stack([output['f1_score']
                                      for output in outputs]).mean()
+        test_f05_score = torch.stack([output['f05_score']
+                                      for output in outputs]).mean()
+        test_f2_score = torch.stack([output['f2_score']
+                                     for output in outputs]).mean()
+        test_precision = torch.stack([output['precision']
+                                      for output in outputs]).mean()
+        test_recall = torch.stack([output['recall']
+                                      for output in outputs]).mean()
 
         # Logging Data to TensorBoard
         self.logger.experiment.add_scalar("Loss/Test",
@@ -297,6 +362,18 @@ class CNN(pl.LightningModule):
                                           self.current_epoch)
         self.logger.experiment.add_scalar('F1_Score/Test',
                                           test_f1_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F05_Score/Test',
+                                          test_f05_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('F2_Score/Test',
+                                          test_f2_score,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Precision/Test',
+                                          test_precision,
+                                          self.current_epoch)
+        self.logger.experiment.add_scalar('Recall/Test',
+                                          test_recall,
                                           self.current_epoch)
 
         # tensorboard_logs = {'test_loss': test_loss_mean,
@@ -323,3 +400,12 @@ class CNN(pl.LightningModule):
         # Iterating over all parameters and logging them
         for name, params in self.named_parameters():
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
+
+    # TODO: Refactor internal metrics
+    # def _calculate_step_metrics(self):
+    #
+    #     return
+    #
+    # def _calculate_epoch_metrics(self):
+    #
+    #     return

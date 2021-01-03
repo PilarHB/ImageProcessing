@@ -59,17 +59,16 @@ class MyImageModule(pl.LightningDataModule):
 
         # Build Dataset
         dataset = datasets.ImageFolder(self.data_dir)
-        # Shuffle the samples
-        samples = dataset.samples.copy()
-        random.shuffle(samples)
-        # Take a subset of the samples
-        dataset.samples = samples[:self.dataset_size] if self.dataset_size is not None else samples
-        train_size = int(0.7 * len(dataset))
-        val_size = int(0.5 * (len(dataset) - train_size))
-        test_size = int(len(dataset) - train_size - val_size)
+
+        dataset_size = len(dataset) if self.dataset_size is None else min(len(dataset), self.dataset_size)
+        train_size = int(0.7 * dataset_size)
+        val_size = int(0.5 * (dataset_size - train_size))
+        test_size = int(dataset_size - train_size - val_size)
         # test_size = len(dataset) - train_size - val_size
         # train_data = datasets.ImageFolder(self.train_dir, transform=transform)
-        self.train_data, self.val_data, self.test_data = random_split(dataset, [train_size, val_size, test_size])
+        self.train_data, self.val_data, self.test_data = random_split(dataset,
+                                                                      [train_size, val_size, test_size],
+                                                                      generator=torch.Generator().manual_seed(42))
         print("Len Train Data", len(self.train_data))
         print("Len Val Data", len(self.val_data))
         print("Len Test Data", len(self.test_data))

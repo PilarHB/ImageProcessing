@@ -56,7 +56,7 @@ class ImageModel():
     def config_callbacks(self):
         # Checkpoint  ################################################
         # Saves the models so it is possible to access afterwards
-        checkpoint_callback = ModelCheckpoint(dirpath= self.MODEL_CKPT_PATH,
+        checkpoint_callback = ModelCheckpoint(dirpath=self.MODEL_CKPT_PATH,
                                               filename=self.MODEL_CKPT,
                                               monitor='val_loss',
                                               save_top_k=3,
@@ -128,10 +128,8 @@ class ImageModel():
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
         model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
-        output = model(image_tensor)
+        features, pred = model(image_tensor)
         # print("Features", self.activation['classifier[6]'])
-        # print("Output", output[0])
-        features = output[0]
         # features_size = output[0].shape
         return features.detach().numpy()
 
