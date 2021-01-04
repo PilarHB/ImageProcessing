@@ -115,12 +115,13 @@ class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self,
+                 config,
                  input_shape: list = [3, 256, 256],
                  backbone: str = 'vgg16',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  batch_size: int = 8,
-                 learning_rate: float = 1e-2,
+                 learning_rate: float = 1e-3,
                  lr_scheduler_gamma: float = 1e-1,
                  num_workers: int = 6):
         super(CNN, self).__init__()
@@ -135,6 +136,8 @@ class CNN(pl.LightningModule):
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
+        self.lr = config["lr"]
+        self.batch_size = config["batch_size"]
 
         # build the model
         self.__build_model()
@@ -236,6 +239,11 @@ class CNN(pl.LightningModule):
             # sampleImg
             sampleImg = torch.rand((1, 3, 256, 256))
             self.logger.experiment.add_graph(CNN(), sampleImg)
+
+        # logging histograms
+        self.custom_histogram_adder()
+
+        # Calculate metrics
         self._calculate_epoch_metrics(outputs, name='Train')
 
     # validation loop
@@ -285,7 +293,8 @@ class CNN(pl.LightningModule):
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
 
     # TODO: Refactor internal metrics
-    def _calculate_step_metrics(self, logits, y):
+    @staticmethod
+    def _calculate_step_metrics(logits, y):
         # prepare the metrics
         loss = F.cross_entropy(logits[1], y)
         # train_loss = self.loss(logits[1], y)

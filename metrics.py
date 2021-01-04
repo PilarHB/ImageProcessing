@@ -301,13 +301,15 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel(model_name='vgg16')
+    # image_model = ImageModel(model_name='vgg16')
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
     # Initialize Image Module
+    image_module = MyImageModule(dataset_size=100, batch_size=32)
     # image_module = MyImageModule(batch_size=32)
-    # image_module.setup()
+    image_module.setup()
+    image_module.train_dataloader()
     # If we want to train the model, we call the trainer
-    image_model.call_trainer()
+    # image_model.call_trainer()
 
     # --- PREDICT RESULTS ---
     # Get name and model used for testing

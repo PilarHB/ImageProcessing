@@ -16,6 +16,7 @@ from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -31,7 +32,7 @@ class ImageModel():
                  batch_size=8,
                  num_epochs=20,
                  img_size=256,
-                 feature_extract=True):
+                 fine_tuning=True):
         super(ImageModel, self).__init__()
         # Parameters
         self.batch_size = batch_size
@@ -39,7 +40,7 @@ class ImageModel():
         self.img_size = img_size
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         # layer params
-        self.feature_extract = feature_extract
+        # self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
         # Set a seed  ################################################
         seed_everything(42)
@@ -56,6 +57,7 @@ class ImageModel():
         self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Tensorboard Logger used
         self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
+        self.fine_tuning = fine_tuning
 
 
     def config_callbacks(self):
@@ -74,7 +76,10 @@ class ImageModel():
                                             patience=2,
                                             verbose=False,
                                             mode='min')
-        return checkpoint_callback, early_stop_callback
+        tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
+                                                   "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
+
+        return checkpoint_callback, early_stop_callback, tune_report_callback
 
     def call_trainer(self):
         # Load images  ################################################
@@ -91,7 +96,7 @@ class ImageModel():
         self.logger.close()
 
         # Load callbacks ########################################
-        checkpoint_callback, early_stop_callback = self.config_callbacks()
+        checkpoint_callback, early_stop_callback, tune_report_callback = self.config_callbacks()
 
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
@@ -100,18 +105,8 @@ class ImageModel():
                              deterministic=True,
                              callbacks=[early_stop_callback, checkpoint_callback])
         # Config Hyperparameters ################################################
-        # Run lr finder
-        lr_finder = trainer.tuner.lr_find(model=self.model,
-                                          min_lr=1.e-8,
-                                          max_lr=0.1,
-                                          num_training=10,
-                                          mode='exponential',
-                                          datamodule=self.image_module)
-        # Inspect results
-        fig = lr_finder.plot()
-        fig.savefig('lr_finder.png', format='png')
-        suggested_lr = lr_finder.suggestion()
-        print("Learning rate suggested:", suggested_lr)
+        if self.fine_tuning:
+            self.tune_model(trainer)
 
         # Train model ################################################
         trainer.fit(model=self.model, datamodule=self.image_module)
@@ -200,17 +195,25 @@ class ImageModel():
         print(model)
         return model
 
-    # TODO: save model graph after trainning
-    def save_graph_logger(self, model):
-        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        val_samples = next(iter(self.image_module.val_dataloader()))
-        # print(val_samples)
-        val_imgs, val_labels = val_samples[0], val_samples[1]
-        grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
-        # write to tensorboard
-        self.logger.experiment.add_image('Graph Model', grid)
-        self.logger.experiment.add_graph(model, val_imgs)
-        self.logger.close()
+    # Find the best learning rate
+    def find_lr(self, trainer):
+        lr_finder = trainer.tuner.lr_find(model=self.model,
+                                          min_lr=1.e-8,
+                                          max_lr=0.9,
+                                          num_training=30,
+                                          mode='exponential',
+                                          datamodule=self.image_module)
+        # Inspect results
+        fig = lr_finder.plot()
+        fig.savefig('lr_finder.png', format='png')
+        suggested_lr = lr_finder.suggestion()
+        print("Learning rate suggested:", suggested_lr)
+
+    # TODO: Fuction to finetune model hyperparameters
+    def tune_model(self, trainer):
+        # Run lr finder
+        self.find_lr(trainer)
+
 
 # --- MAIN ----
 if __name__ == '__main__':
