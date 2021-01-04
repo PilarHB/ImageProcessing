@@ -127,6 +127,7 @@ class CNN(pl.LightningModule):
         # parameters
         self.save_hyperparameters()
         self.dim = input_shape
+        # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'inception_v3', 'googlenet'
         self.backbone = backbone
         self.train_bn = train_bn
         self.milestones = milestones
@@ -145,10 +146,6 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
-        print("##### ENTERO ########")
-        _layers = list(backbone.children())
-        print(_layers)
-        print("##### CON MENOS 1 ########")
         _layers = list(backbone.children())[:-1]
         print(_layers)
         self.feature_extractor = torch.nn.Sequential(*_layers)
@@ -234,6 +231,11 @@ class CNN(pl.LightningModule):
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
+        # computation graph add it during the first epoch only
+        if self.current_epoch == 1:
+            # sampleImg
+            sampleImg = torch.rand((1, 3, 256, 256))
+            self.logger.experiment.add_graph(CNN(), sampleImg)
         self._calculate_epoch_metrics(outputs, name='Train')
 
     # validation loop

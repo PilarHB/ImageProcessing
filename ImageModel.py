@@ -27,8 +27,9 @@ torch.set_printoptions(linewidth=120)
 
 class ImageModel():
     def __init__(self,
+                 model_name,
                  batch_size=8,
-                 num_epochs=15,
+                 num_epochs=20,
                  img_size=256,
                  feature_extract=True):
         super(ImageModel, self).__init__()
@@ -40,19 +41,21 @@ class ImageModel():
         # layer params
         self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
-        # Save the model after every epoch by monitoring a quantity.
-        current_path = os.path.dirname(os.path.realpath(__file__))
-        self.MODEL_CKPT_PATH = os.path.join(current_path, 'model/')
-        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
+        self.model_name = model_name
         self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
         # self.image_module = MyImageModule(batch_size=self.batch_size)
+        # For getting the features for the image
         self.activation = {}
+        # Save the model after every epoch by monitoring a quantity.
+        current_path = os.path.dirname(os.path.realpath(__file__))
+        self.MODEL_CKPT_PATH = os.path.join(current_path, f'model/{self.model_name}/')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Tensorboard Logger used
-        self.logger = TensorBoardLogger('tb_logs', name='my_model')
+        self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
 
 
     def config_callbacks(self):
@@ -61,7 +64,7 @@ class ImageModel():
         checkpoint_callback = ModelCheckpoint(dirpath=self.MODEL_CKPT_PATH,
                                               filename=self.MODEL_CKPT,
                                               monitor='val_loss',
-                                              save_top_k=3,
+                                              save_top_k=1,
                                               mode='min',
                                               save_weights_only=True)
         # EarlyStopping  ################################################
@@ -96,7 +99,21 @@ class ImageModel():
                              logger=self.logger,
                              deterministic=True,
                              callbacks=[early_stop_callback, checkpoint_callback])
+        # Config Hyperparameters ################################################
+        # Run lr finder
+        lr_finder = trainer.tuner.lr_find(model=self.model,
+                                          min_lr=1.e-8,
+                                          max_lr=0.1,
+                                          num_training=10,
+                                          mode='exponential',
+                                          datamodule=self.image_module)
+        # Inspect results
+        fig = lr_finder.plot()
+        fig.savefig('lr_finder.png', format='png')
+        suggested_lr = lr_finder.suggestion()
+        print("Learning rate suggested:", suggested_lr)
 
+        # Train model ################################################
         trainer.fit(model=self.model, datamodule=self.image_module)
         # Test  ################################################
         trainer.test(datamodule=self.image_module)

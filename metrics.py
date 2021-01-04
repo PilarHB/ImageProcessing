@@ -41,7 +41,6 @@ class Model_Metrics():
         self.targets = targets
         self.name_model = name_model
         current_path = os.path.dirname(os.path.realpath(__file__))
-
         self.CSV_PATH = os.path.join(current_path,
                                      'models_metrics/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
         self.METRICS_FIGURES_PATH = os.path.join(current_path, 'models_metrics/%s_metrics' % self.name_model)
@@ -233,13 +232,14 @@ def predict(model, loader):
 
 @torch.no_grad()
 def get_all_preds(model, loader):
-    all_preds = torch.tensor([])
-    all_targets = torch.tensor([])
-    for batch in loader:
-        images, labels = batch
-        preds = model(images)
-        all_preds = torch.cat((all_preds, preds[1]), dim=0)
-        all_targets = torch.cat((all_targets, labels), dim=0)
+    with torch.no_grad():
+        all_preds = torch.tensor([])
+        all_targets = torch.tensor([])
+        for batch in loader:
+            images, labels = batch
+            preds = model(images)
+            all_preds = torch.cat((all_preds, preds[1]), dim=0)
+            all_targets = torch.cat((all_targets, labels), dim=0)
     return all_preds, all_targets
 
 
@@ -279,8 +279,8 @@ def get_probabilities(model, testloader):
             class_probs.append(class_probs_batch)
             class_preds.append(class_preds_batch)
 
-    test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
-    test_preds = torch.cat(class_preds)
+        test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
+        test_preds = torch.cat(class_preds)
 
     return test_probs, test_preds
 
@@ -301,7 +301,7 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel()
+    image_model = ImageModel(model_name='vgg16')
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
     # Initialize Image Module
     # image_module = MyImageModule(batch_size=32)
@@ -313,6 +313,7 @@ if __name__ == '__main__':
     # Get name and model used for testing
     # name_model, inference_model = image_model.inference_model()
     # print("Inference model:", inference_model)
+    # print("Name:", name_model)
 
     # Prediction with no tensors
     # y_true, y_pred = predict(inference_model, image_module.test_dataloader())
