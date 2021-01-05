@@ -115,7 +115,6 @@ class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self,
-                 config,
                  input_shape: list = [3, 256, 256],
                  backbone: str = 'vgg16',
                  train_bn: bool = True,
@@ -136,8 +135,8 @@ class CNN(pl.LightningModule):
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.num_workers = num_workers
-        self.lr = config["lr"]
-        self.batch_size = config["batch_size"]
+        # self.lr = config["lr"]
+        # self.batch_size = config["batch_size"]
 
         # build the model
         self.__build_model()
@@ -149,31 +148,34 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
-        _layers = list(backbone.children())[:-1]
-        print(_layers)
+        _layers = list(backbone.children())[:-2]
+        # print(_layers)
         self.feature_extractor = torch.nn.Sequential(*_layers)
         # print(self.feature_extractor)
         # If.eval() is used, then the layers are frozen.
         # self.feature_extractor.eval()
         freeze(module=self.feature_extractor, train_bn=self.train_bn)
+        # si queremos descongelar últimas capas
+        # freeze(module=self.feature_extractor, n=-3, train_bn=self.train_bn)
 
-        # 2. Classifier:
-        # _fc_layers = [torch.nn.Linear(2048, 256),
-        #               torch.nn.Linear(256, 32),
-        #               torch.nn.Linear(32, 1)]
-        # self.fc = torch.nn.Sequential(*_fc_layers)
-
+        # 2. Adaptive layer:
         self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        self.feature_extractor.add_module("(2)", self.adaptive_layer)
-        print(self.feature_extractor)
+        self.feature_extractor.add_module("adaptive_layer", self.adaptive_layer)
+        # print(self.feature_extractor)
 
         # classes are two: success or failure
         num_target_classes = 2
         n_sizes = self._get_conv_output(self.dim)
-        _fc_layers = [nn.Linear(n_sizes, num_target_classes)]
+
+        # 3. Classifier
+        _fc_layers = [torch.nn.Linear(n_sizes, 256),
+                      torch.nn.Linear(256, 32),
+                      torch.nn.Linear(32, num_target_classes)]
+        # self.fc = torch.nn.Sequential(*_fc_layers)
+        # _fc_layers = [nn.Linear(n_sizes, num_target_classes)]
         self.fc = torch.nn.Sequential(*_fc_layers)
 
-        # 3. Loss:
+        # 4. Loss:
         # self.loss_func = F.cross_entropy
 
     # mandatory
@@ -182,19 +184,14 @@ class CNN(pl.LightningModule):
         """Forward pass. Returns logits."""
         # 1. Feature extraction:
         t = self.feature_extractor(t)
-        print("t:", t.size())
+        # print("t:", t.size())
         features = t.squeeze(-1).squeeze(-1)
-        print("Features", features.size())
+        # print("Features", features.size())
         # 2. Classifier (returns logits):
         t = self.fc(features)
         # We want the probability to sum 1
         t = F.log_softmax(t, dim=1)
         return features, t
-
-    def set_parameter_requires_grad(self, model, feature_extracting):
-        if feature_extracting:
-            for param in model.parameters():
-                param.requires_grad = False
 
     # returns the size of the output tensor going into the Linear layer from the conv block.
     def _get_conv_output(self, shape):

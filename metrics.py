@@ -35,15 +35,16 @@ from ImageModel import ImageModel
 
 
 class Model_Metrics():
-    def __init__(self, preds, targets, name_model):
+    def __init__(self, preds, targets, name_model, parent_model):
         super(Model_Metrics, self).__init__()
         self.preds = preds
         self.targets = targets
+        self.parent_model = parent_model
         self.name_model = name_model
         current_path = os.path.dirname(os.path.realpath(__file__))
         self.CSV_PATH = os.path.join(current_path,
                                      'models_metrics/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
-        self.METRICS_FIGURES_PATH = os.path.join(current_path, 'models_metrics/%s_metrics' % self.name_model)
+        self.METRICS_FIGURES_PATH = os.path.join(current_path, f'models_metrics/{self.parent_model}/%s_metrics' % self.name_model)
         # define the directory for the images
         pathlib.Path(self.METRICS_FIGURES_PATH).mkdir(parents=True, exist_ok=True)
         self.ROC_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'ROC_Curve.png')
@@ -301,21 +302,19 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    # image_model = ImageModel(model_name='vgg16')
-    # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
+    image_model = ImageModel(model_name='vgg16')
     # Initialize Image Module
-    image_module = MyImageModule(dataset_size=100, batch_size=32)
-    # image_module = MyImageModule(batch_size=32)
+    # image_module = MyImageModule(dataset_size=100, batch_size=32)
+    image_module = MyImageModule(batch_size=32)
     image_module.setup()
-    image_module.train_dataloader()
-    # If we want to train the model, we call the trainer
-    # image_model.call_trainer()
 
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
     # name_model, inference_model = image_model.inference_model()
-    # print("Inference model:", inference_model)
-    # print("Name:", name_model)
+    name_model = 'model-epoch=15-val_loss=0.46.ckpt'
+    inference_model = image_model.load_model(name_model)
+    print("Inference model:", inference_model)
+    print("Name:", name_model)
 
     # Prediction with no tensors
     # y_true, y_pred = predict(inference_model, image_module.test_dataloader())
@@ -323,16 +322,16 @@ if __name__ == '__main__':
     # print("y_pred", y_true)
 
     # Predictions with tensors
-    # test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
+    test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
     # print("Test preds:", test_preds)
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    # metrics = Model_Metrics(test_preds, test_targets, name_model)
+    metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='vgg16')
     # preds_correct = metrics.get_num_correct()
     # print('total correct:', preds_correct)
     # print('accuracy:', preds_correct / len(image_module.test_data))
-    # metrics.get_test_metrics(display=True)
+    metrics.get_test_metrics(display=True)
 
     # # Without tensors
     # preds_correct = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
@@ -354,15 +353,5 @@ if __name__ == '__main__':
     # for i in range(len(class_names)):
     #     add_pr_curve_tensorboard(image_model.writer, i, test_probs, class_names, test_preds)
 
-    # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-    # val_samples = next(iter(image_module.val_dataloader()))
-    # val_imgs, val_labels = val_samples[0], val_samples[1]
-    # print(val_imgs.shape)
-    # print(val_labels.shape)
-    # grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
-    # write to tensorboard
-    # image_model.writer.add_image('prueba_hola', grid)
-    # image_model.writer.add_graph(inference_model, val_imgs)
-    # image_model.writer.close()
 
     # show_activations(inference_model)

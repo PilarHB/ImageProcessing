@@ -30,7 +30,7 @@ class ImageModel():
     def __init__(self,
                  model_name,
                  batch_size=8,
-                 num_epochs=20,
+                 num_epochs=30,
                  img_size=256,
                  fine_tuning=True):
         super(ImageModel, self).__init__()
@@ -47,8 +47,8 @@ class ImageModel():
         # Load model  ################################################
         self.model = CNN()
         self.model_name = model_name
-        self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
-        # self.image_module = MyImageModule(batch_size=self.batch_size)
+        # self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
+        self.image_module = MyImageModule(batch_size=self.batch_size)
         # For getting the features for the image
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
@@ -228,18 +228,18 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel()
-    checkpoint_callback, early_stop_callback = image_model.config_callbacks()
+    image_model = ImageModel(model_name='vgg16')
+    # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################
-    # image_model.call_trainner()
+    image_model.call_trainer()
     # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
-    best_model = image_model.load_best_model()
-    print("Best model:", best_model)
-    inference_model = image_model.inference_model()
-    print(inference_model)
+    # best_model = image_model.load_best_model()
+    # print("Best model:", best_model)
+    # inference_model = image_model.inference_model()
+    # print(inference_model)
 
     #  Evaluate output  ################################################
     # image = Image.open("./images/fail/img1605601451.8657722.png")

@@ -110,9 +110,9 @@ class MyImageModule(pl.LightningDataModule):
         self.val_data = TransformSubset(val_data, transform=self.transform)
         self.test_data = TransformSubset(test_data, transform=self.transform)
 
-        print('Targets Train:', TransformSubset(train_data, transform=self.augmentation).count_targets())
-        print('Targets Val:', TransformSubset(val_data, transform=self.augmentation).count_targets())
-        print('Targets Test:', TransformSubset(test_data, transform=self.augmentation).count_targets())
+        # print('Targets Train:', TransformSubset(train_data, transform=self.augmentation).count_targets())
+        # print('Targets Val:', TransformSubset(val_data, transform=self.augmentation).count_targets())
+        # print('Targets Test:', TransformSubset(test_data, transform=self.augmentation).count_targets())
 
     def train_dataloader(self):
         train_loader = torch.utils.data.DataLoader(self.train_data, batch_size=self.batch_size)
