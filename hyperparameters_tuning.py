@@ -20,22 +20,19 @@ import pytorch_lightning as pl
 
 def train_model_tune(config, data_dir=None, num_epochs=10, num_gpus=1):
     model = CNN(config)
+    image_module = MyImageModule(dataset_size=100, batch_size=32)
+    image_module.setup()
+    logger = TensorBoardLogger('tb_logs', name='Model_prueba_tuning')
     trainer = pl.Trainer(max_epochs=num_epochs,
                          gpus=num_gpus,
-                         logger=TensorBoardLogger(
-                             save_dir=tune.get_trial_dir(), name="", version="."),
-                         progress_bar_refresh_rate=0,
+                         logger=logger,
+                         deterministic=True,
                          callbacks=[TuneReportCallback({"loss": "ptl/val_loss",
                                                         "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")])
-    trainer.fit(model)
+    trainer.fit(model, datamodule=image_module)
 
 
 def tune_model(num_samples=10, num_epochs=10, gpus_per_trial=1):
-
-    # setting the datamodule
-    image_module = MyImageModule(batch_size=32)
-    image_module.setup()
-
     # config the parameters
     config = {
         "lr": tune.loguniform(1e-4, 1e-1),
@@ -53,7 +50,7 @@ def tune_model(num_samples=10, num_epochs=10, gpus_per_trial=1):
     analysis = tune.run(
         tune.with_parameters(
             train_model_tune,
-            data_dir=data_dir,
+            data_dir='pruebas_tuning',
             num_epochs=num_epochs,
             num_gpus=gpus_per_trial),
         resources_per_trial={
@@ -75,6 +72,12 @@ def tune_model(num_samples=10, num_epochs=10, gpus_per_trial=1):
 
     print("Best hyperparameters found were: ", analysis.best_config)
 
-    shutil.rmtree(data_dir)
+    shutil.rmtree('pruebas_tuning')
+
 
 # Code specially prepared to finetune parameters in the desired models
+
+if __name__ == '__main__':
+    tune_model(num_samples=10, num_epochs=10, gpus_per_trial=1)
+
+    # TODO : Check por qué no funciona y ver si merece la pena
