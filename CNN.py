@@ -116,7 +116,7 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self,
                  input_shape: list = [3, 256, 256],
-                 backbone: str = 'vgg16',
+                 backbone: str = 'resnet50',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  batch_size: int = 8,
@@ -127,7 +127,7 @@ class CNN(pl.LightningModule):
         # parameters
         self.save_hyperparameters()
         self.dim = input_shape
-        # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'inception_v3', 'googlenet'
+        # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'googlenet'
         self.backbone = backbone
         self.train_bn = train_bn
         self.milestones = milestones
@@ -148,15 +148,22 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
-        _layers = list(backbone.children())[:-2]
-        # print(_layers)
+        print("BEFORE CUT")
+        _layers = list(backbone.children())
+        print(_layers)
+        print("AFTER CUT")
+        _layers = list(backbone.children())[:-1]
+        print(_layers)
         self.feature_extractor = torch.nn.Sequential(*_layers)
         # print(self.feature_extractor)
         # If.eval() is used, then the layers are frozen.
         # self.feature_extractor.eval()
         freeze(module=self.feature_extractor, train_bn=self.train_bn)
         # si queremos descongelar últimas capas
-        # freeze(module=self.feature_extractor, n=-3, train_bn=self.train_bn)
+        freeze(module=self.feature_extractor, n=-1, train_bn=self.train_bn)
+        # _unfreeze_and_add_param_group(
+        #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
+        # )
 
         # 2. Adaptive layer:
         self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
@@ -199,11 +206,11 @@ class CNN(pl.LightningModule):
         input = torch.autograd.Variable(torch.rand(batch_size, *shape))
 
         output_feat = self._forward_features(input)
-        print("output_feat")
-        print(output_feat.size())
+        # print("output_feat")
+        # print(output_feat.size())
         n_size = output_feat.data.view(batch_size, -1).size(1)
-        print("n_size")
-        print(n_size)
+        # print("n_size")
+        # print(n_size)
         return n_size
 
     def get_size(self):
@@ -213,7 +220,7 @@ class CNN(pl.LightningModule):
     # returns the feature tensor from the conv block
     def _forward_features(self, x):
         x = self.feature_extractor(x)
-        print("Size last_layer", x.size())
+        # print("Size last_layer", x.size())
         return x
 
     # loss function

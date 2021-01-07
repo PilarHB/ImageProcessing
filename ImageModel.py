@@ -16,7 +16,7 @@ from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from ray.tune.integration.pytorch_lightning import TuneReportCallback
+#from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -76,10 +76,10 @@ class ImageModel():
                                             patience=2,
                                             verbose=False,
                                             mode='min')
-        tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
-                                                   "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
+        # tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
+        #                                            "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
 
-        return checkpoint_callback, early_stop_callback, tune_report_callback
+        return checkpoint_callback, early_stop_callback
 
     def call_trainer(self):
         # Load images  ################################################
@@ -96,7 +96,7 @@ class ImageModel():
         self.logger.close()
 
         # Load callbacks ########################################
-        checkpoint_callback, early_stop_callback, tune_report_callback = self.config_callbacks()
+        checkpoint_callback, early_stop_callback = self.config_callbacks()
 
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
@@ -104,6 +104,7 @@ class ImageModel():
                              logger=self.logger,
                              deterministic=True,
                              callbacks=[early_stop_callback, checkpoint_callback])
+
         # Config Hyperparameters ################################################
         if self.fine_tuning:
             self.tune_model(trainer)
@@ -137,7 +138,7 @@ class ImageModel():
     @torch.no_grad()
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
-        model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
+        # model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
         features, pred = model(image_tensor)
         # print("Features", self.activation['classifier[6]'])
         # features_size = output[0].shape
@@ -198,7 +199,7 @@ class ImageModel():
     # Find the best learning rate
     def find_lr(self, trainer):
         lr_finder = trainer.tuner.lr_find(model=self.model,
-                                          min_lr=1.e-8,
+                                          min_lr=1.e-5,
                                           max_lr=0.9,
                                           num_training=30,
                                           mode='exponential',
@@ -209,10 +210,14 @@ class ImageModel():
         suggested_lr = lr_finder.suggestion()
         print("Learning rate suggested:", suggested_lr)
 
+    def find_optimal_batch_size(self, trainer):
+        trainer.tune(model=self.model)
+
     # TODO: Fuction to finetune model hyperparameters
     def tune_model(self, trainer):
         # Run lr finder
         self.find_lr(trainer)
+        self.find_optimal_batch_size(trainer)
 
 
 # --- MAIN ----
@@ -228,7 +233,7 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel(model_name='vgg16')
+    image_model = ImageModel(model_name='resnet50')
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################

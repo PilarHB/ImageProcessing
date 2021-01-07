@@ -4,6 +4,7 @@ import os
 import io
 from collections import Iterable
 import pathlib
+from typing import Optional
 
 import torch
 import numpy as np
@@ -20,6 +21,8 @@ from pytorch_lightning.metrics.functional import stat_scores, f1, confusion_matr
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import classification_report, roc_curve, auc, precision_recall_curve
 import torch.nn.functional as F
+from torch.nn import Module
+BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 from torch.utils.tensorboard import SummaryWriter
 
 from CNN import CNN
@@ -43,8 +46,10 @@ class Model_Metrics():
         self.name_model = name_model
         current_path = os.path.dirname(os.path.realpath(__file__))
         self.CSV_PATH = os.path.join(current_path,
-                                     'models_metrics/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
-        self.METRICS_FIGURES_PATH = os.path.join(current_path, f'models_metrics/{self.parent_model}/%s_metrics' % self.name_model)
+                                     f'models_metrics/{self.parent_model}/%s_metrics/%s_metrics.csv' % (
+                                     self.name_model, self.name_model))
+        self.METRICS_FIGURES_PATH = os.path.join(current_path,
+                                                 f'models_metrics/{self.parent_model}/%s_metrics' % self.name_model)
         # define the directory for the images
         pathlib.Path(self.METRICS_FIGURES_PATH).mkdir(parents=True, exist_ok=True)
         self.ROC_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'ROC_Curve.png')
@@ -288,21 +293,29 @@ def get_probabilities(model, testloader):
 
 def show_activations(model):
     # _layers = list(model.children())[:-1]
-    _layers = list(model.children())
-    # print(_layers)
-    for layer in _layers:
-        print("layer", layer)
-        if isinstance(layer, Iterable):
-            for i in layer:
-                print("sublayer", i)
-        # else:
-        #     print(layer)
+    _layers = list(model.feature_extractor.children())[:-1]
+   #  _sublayers = list((model.feature_extractor.children()).children())
+    # _layers = _layers[:-1]
+    print(_layers)
+    # print(_sublayers)
+    # for layer in _layers:
+    #     # print("layer", layer)
+    #     if isinstance(layer, Iterable):
+    #         for i in layer:
+    #             # _sublayers = list(i)
+    #             print("%i", i)
+    #             if isinstance(i, Iterable):
+    #                 for sublayer in _sublayers:
+    #                     print("sub_sublayer", sublayer)
+
+    # else:
+    #     print(layer)
 
 
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel(model_name='vgg16')
+    image_model = ImageModel(model_name='resnet50')
     # Initialize Image Module
     # image_module = MyImageModule(dataset_size=100, batch_size=32)
     image_module = MyImageModule(batch_size=32)
@@ -311,9 +324,9 @@ if __name__ == '__main__':
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
     # name_model, inference_model = image_model.inference_model()
-    name_model = 'model-epoch=15-val_loss=0.46.ckpt'
+    name_model = 'model-epoch=05-val_loss=0.39.ckpt'
     inference_model = image_model.load_model(name_model)
-    print("Inference model:", inference_model)
+    # print("Inference model:", inference_model)
     print("Name:", name_model)
 
     # Prediction with no tensors
@@ -322,16 +335,16 @@ if __name__ == '__main__':
     # print("y_pred", y_true)
 
     # Predictions with tensors
-    test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
+    # test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
     # print("Test preds:", test_preds)
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='vgg16')
+    # metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='resnet50')
     # preds_correct = metrics.get_num_correct()
     # print('total correct:', preds_correct)
     # print('accuracy:', preds_correct / len(image_module.test_data))
-    metrics.get_test_metrics(display=True)
+    # metrics.get_test_metrics(display=True)
 
     # # Without tensors
     # preds_correct = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))
@@ -353,5 +366,6 @@ if __name__ == '__main__':
     # for i in range(len(class_names)):
     #     add_pr_curve_tensorboard(image_model.writer, i, test_probs, class_names, test_preds)
 
-
     # show_activations(inference_model)
+
+

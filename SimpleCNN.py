@@ -70,9 +70,14 @@ class SimpleCNN(pl.LightningModule):
 
         self.pool1 = torch.nn.MaxPool2d(2)
         self.pool2 = torch.nn.MaxPool2d(2)
-        n_sizes = self._get_conv_output(self.dim)
+
+        _feature_extractor_layes = [self.conv1, ]
+
+        self.feauture_extractor = nn.Sequential()
+
 
         # Classifier
+        n_sizes = self._get_conv_output(self.dim)
         self.fc1 = nn.Linear(n_sizes, 512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128, self.num_target_classes)
@@ -85,7 +90,6 @@ class SimpleCNN(pl.LightningModule):
     def _get_conv_output(self, shape):
         batch_size = 1
         input = torch.autograd.Variable(torch.rand(batch_size, *shape))
-
         output_feat = self._forward_features(input)
         n_size = output_feat.data.view(batch_size, -1).size(1)
         return n_size
