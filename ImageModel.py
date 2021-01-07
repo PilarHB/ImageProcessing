@@ -16,6 +16,7 @@ from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -27,37 +28,45 @@ torch.set_printoptions(linewidth=120)
 
 class ImageModel():
     def __init__(self,
+                 model_name,
                  batch_size=8,
-                 num_epochs=15,
+                 num_epochs=30,
                  img_size=256,
-                 feature_extract=True):
+                 fine_tuning=True):
         super(ImageModel, self).__init__()
         # Parameters
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.img_size = img_size
-        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped layer params
-        self.feature_extract = feature_extract
+        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
+        # layer params
+        # self.feature_extract = feature_extract
         # criterion = nn.CrossEntropyLoss()
-        # Save the model after every epoch by monitoring a quantity.
-        current_path = os.path.dirname(os.path.realpath(__file__))
-        self.MODEL_CKPT_PATH = os.path.join(current_path, 'model/')
-        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
         self.model = CNN()
-        # self.image_module = MyImageModule(batch_size=self.batch_size)
-        # self.image_module.setup()
+        self.model_name = model_name
+        # self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
+        self.image_module = MyImageModule(batch_size=self.batch_size)
+        # For getting the features for the image
         self.activation = {}
-        self.writer = SummaryWriter('tb_logs/pruebas')
+        # Save the model after every epoch by monitoring a quantity.
+        current_path = os.path.dirname(os.path.realpath(__file__))
+        self.MODEL_CKPT_PATH = os.path.join(current_path, f'model/{self.model_name}/')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
+        # Tensorboard Logger used
+        self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
+        self.fine_tuning = fine_tuning
+
 
     def config_callbacks(self):
         # Checkpoint  ################################################
         # Saves the models so it is possible to access afterwards
-        checkpoint_callback = ModelCheckpoint(filepath=self.MODEL_CKPT,
+        checkpoint_callback = ModelCheckpoint(dirpath=self.MODEL_CKPT_PATH,
+                                              filename=self.MODEL_CKPT,
                                               monitor='val_loss',
-                                              save_top_k=3,
+                                              save_top_k=1,
                                               mode='min',
                                               save_weights_only=True)
         # EarlyStopping  ################################################
@@ -67,44 +76,43 @@ class ImageModel():
                                             patience=2,
                                             verbose=False,
                                             mode='min')
-        return checkpoint_callback, early_stop_callback
+        tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
+                                                   "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
+
+        return checkpoint_callback, early_stop_callback, tune_report_callback
 
     def call_trainer(self):
         # Load images  ################################################
-        self.image_module = MyImageModule(batch_size=self.batch_size)
         self.image_module.setup()
 
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
-        val_imgs, val_labels = val_samples[0], val_samples[1]
+        # val_imgs, val_labels = val_samples[0], val_samples[1]
         # print(val_imgs.shape)
         # print(val_labels.shape)
         grid = torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2)
-        # show images
-        # plt.imshow(grid)
         # write to tensorboard
-        self.writer.add_image('prueba', grid)
-        # self.writer.close()
+        self.logger.experiment.add_image('prueba', grid)
+        self.logger.close()
 
         # Load callbacks ########################################
-        checkpoint_callback, early_stop_callback = self.config_callbacks()
-
-        # Logger ################################################
-        # Tensorboard Logger used
-        logger = TensorBoardLogger('tb_logs', name='my_model')
+        checkpoint_callback, early_stop_callback, tune_report_callback = self.config_callbacks()
 
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             default_root_dir='./checkpoints',
                              gpus=1,
-                             logger=logger,
+                             logger=self.logger,
                              deterministic=True,
-                             callbacks=[early_stop_callback],
-                             checkpoint_callback=checkpoint_callback)
+                             callbacks=[early_stop_callback, checkpoint_callback])
+        # Config Hyperparameters ################################################
+        if self.fine_tuning:
+            self.tune_model(trainer)
 
-        trainer.fit(self.model, self.image_module)
+        # Train model ################################################
+        trainer.fit(model=self.model, datamodule=self.image_module)
         # Test  ################################################
-        # trainer.test()
+        trainer.test(datamodule=self.image_module)
+        # self.save_graph_logger(self.model)
 
     def evaluate(self, model, loader):
         y_true = []
@@ -130,10 +138,8 @@ class ImageModel():
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
         model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
-        output = model(image_tensor)
+        features, pred = model(image_tensor)
         # print("Features", self.activation['classifier[6]'])
-        # print("Output", output[0])
-        features = output[0]
         # features_size = output[0].shape
         return features.detach().numpy()
 
@@ -150,10 +156,12 @@ class ImageModel():
         print(image_tensor.shape)
         return image_tensor
 
+    @torch.no_grad()
     def inference_model(self):
         best_model = self.load_best_model()
+        # print(best_model)
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
-        return inference_model
+        return best_model, inference_model
 
     # TODO: Revisar este método, creo que no es necesario
     def evaluate_model(self):
@@ -187,39 +195,24 @@ class ImageModel():
         print(model)
         return model
 
-    def plot_precision_recall_curve(self, recall, precision):
-        fig, ax = plt.subplots()
-        ax.step(recall, precision, color='r', alpha=0.99, where='post')
-        ax.fill_between(recall, precision, alpha=0.2, color='b', step='post')
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.ylim([0.0, 1.05])
-        plt.xlim([0.0, 1.0])
-        # plt.legend(loc="lower right")
-        plt.title('Precision Recall Curve')
-        fig.savefig("./stat_images/precision_recall_curve.png", format='png')
+    # Find the best learning rate
+    def find_lr(self, trainer):
+        lr_finder = trainer.tuner.lr_find(model=self.model,
+                                          min_lr=1.e-8,
+                                          max_lr=0.9,
+                                          num_training=30,
+                                          mode='exponential',
+                                          datamodule=self.image_module)
+        # Inspect results
+        fig = lr_finder.plot()
+        fig.savefig('lr_finder.png', format='png')
+        suggested_lr = lr_finder.suggestion()
+        print("Learning rate suggested:", suggested_lr)
 
-    def plot_roc_curve(self, y_true, y_pred):
-        # Compute ROC curve and ROC area for each class
-        y_test = y_true
-        y_score = y_pred
-
-        fpr, tpr, thresholds = roc_curve(y_test, y_score, pos_label=2)
-        roc_auc = auc(fpr, tpr)
-
-        fig, ax = plt.figure()
-        lw = 2
-        plt.plot(fpr, tpr, color='darkorange',
-                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
-        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic example')
-        plt.legend(loc="lower right")
-        plt.show()
-        fig.savefig("./stat_images/ROC_curve.png", format='png')
+    # TODO: Fuction to finetune model hyperparameters
+    def tune_model(self, trainer):
+        # Run lr finder
+        self.find_lr(trainer)
 
 
 # --- MAIN ----
@@ -235,18 +228,18 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel()
-    checkpoint_callback, early_stop_callback = image_model.config_callbacks()
+    image_model = ImageModel(model_name='vgg16')
+    # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################
-    # image_model.call_trainner()
+    image_model.call_trainer()
     # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
     # Load best model  ################################################
-    best_model = image_model.load_best_model()
-    print("Best model:", best_model)
-    inference_model = image_model.inference_model()
-    print(inference_model)
+    # best_model = image_model.load_best_model()
+    # print("Best model:", best_model)
+    # inference_model = image_model.inference_model()
+    # print(inference_model)
 
     #  Evaluate output  ################################################
     # image = Image.open("./images/fail/img1605601451.8657722.png")
@@ -260,15 +253,5 @@ if __name__ == '__main__':
     # inference_model = image_model.inference_model()
     # y_true, y_pred = image_model.evaluate_model()
 
-    # Generate binary correctness labels across classes
-    # binary_ground_truth = label_binarize(y_true,
-    #                                     classes=np.arange(0, 1).tolist())
-    # print("binary_ground_truth", binary_ground_truth)
 
-    # precision_micro, recall_micro, _ = precision_recall_curve(binary_ground_truth.ravel(), y_pred.ravel())
-    # precision, recall, _ = precision_recall_curve(torch.tensor(y_pred), torch.tensor(y_true))
 
-    # Plot metrics - Precision-Recall Curve
-    # image_model.plot_precision_recall_curve(recall, precision)
-    # Plot metrics - ROC Curve
-    # plot_roc_curve(y_true, y_pred)
