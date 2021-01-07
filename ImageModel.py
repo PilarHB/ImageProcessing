@@ -138,7 +138,7 @@ class ImageModel():
     @torch.no_grad()
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
-        model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
+        # model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
         features, pred = model(image_tensor)
         # print("Features", self.activation['classifier[6]'])
         # features_size = output[0].shape
