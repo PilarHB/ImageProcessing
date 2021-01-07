@@ -148,15 +148,22 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
-        _layers = list(backbone.children())[:-2]
-        # print(_layers)
+        print("BEFORE CUT")
+        _layers = list(backbone.children())
+        print(_layers)
+        print("AFTER CUT")
+        _layers = list(backbone.children())[:-1]
+        print(_layers)
         self.feature_extractor = torch.nn.Sequential(*_layers)
         # print(self.feature_extractor)
         # If.eval() is used, then the layers are frozen.
         # self.feature_extractor.eval()
         freeze(module=self.feature_extractor, train_bn=self.train_bn)
         # si queremos descongelar últimas capas
-        # freeze(module=self.feature_extractor, n=-3, train_bn=self.train_bn)
+        freeze(module=self.feature_extractor, n=-1, train_bn=self.train_bn)
+        # _unfreeze_and_add_param_group(
+        #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
+        # )
 
         # 2. Adaptive layer:
         self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
