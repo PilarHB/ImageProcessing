@@ -213,7 +213,7 @@ class CNN(pl.LightningModule):
     # returns the feature tensor from the conv block
     def _forward_features(self, x):
         x = self.feature_extractor(x)
-        print("Size last_layer", x.size())
+        # print("Size last_layer", x.size())
         return x
 
     # loss function
