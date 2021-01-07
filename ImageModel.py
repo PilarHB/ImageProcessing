@@ -104,6 +104,7 @@ class ImageModel():
                              logger=self.logger,
                              deterministic=True,
                              callbacks=[early_stop_callback, checkpoint_callback])
+
         # Config Hyperparameters ################################################
         if self.fine_tuning:
             self.tune_model(trainer)
@@ -198,7 +199,7 @@ class ImageModel():
     # Find the best learning rate
     def find_lr(self, trainer):
         lr_finder = trainer.tuner.lr_find(model=self.model,
-                                          min_lr=1.e-8,
+                                          min_lr=1.e-5,
                                           max_lr=0.9,
                                           num_training=30,
                                           mode='exponential',
@@ -209,10 +210,14 @@ class ImageModel():
         suggested_lr = lr_finder.suggestion()
         print("Learning rate suggested:", suggested_lr)
 
+    def find_optimal_batch_size(self, trainer):
+        trainer.tune(model=self.model)
+
     # TODO: Fuction to finetune model hyperparameters
     def tune_model(self, trainer):
         # Run lr finder
         self.find_lr(trainer)
+        self.find_optimal_batch_size(trainer)
 
 
 # --- MAIN ----
@@ -228,7 +233,7 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel(model_name='vgg16')
+    image_model = ImageModel(model_name='resnet50')
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################

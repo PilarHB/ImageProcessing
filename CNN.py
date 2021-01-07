@@ -116,7 +116,7 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self,
                  input_shape: list = [3, 256, 256],
-                 backbone: str = 'vgg16',
+                 backbone: str = 'resnet50',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  batch_size: int = 8,
@@ -127,7 +127,7 @@ class CNN(pl.LightningModule):
         # parameters
         self.save_hyperparameters()
         self.dim = input_shape
-        # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'inception_v3', 'googlenet'
+        # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'googlenet'
         self.backbone = backbone
         self.train_bn = train_bn
         self.milestones = milestones

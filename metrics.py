@@ -43,7 +43,7 @@ class Model_Metrics():
         self.name_model = name_model
         current_path = os.path.dirname(os.path.realpath(__file__))
         self.CSV_PATH = os.path.join(current_path,
-                                     'models_metrics/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
+                                     f'models_metrics/{self.parent_model}/%s_metrics/%s_metrics.csv' % (self.name_model, self.name_model))
         self.METRICS_FIGURES_PATH = os.path.join(current_path, f'models_metrics/{self.parent_model}/%s_metrics' % self.name_model)
         # define the directory for the images
         pathlib.Path(self.METRICS_FIGURES_PATH).mkdir(parents=True, exist_ok=True)
@@ -302,7 +302,7 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel(model_name='vgg16')
+    image_model = ImageModel(model_name='resnet50')
     # Initialize Image Module
     # image_module = MyImageModule(dataset_size=100, batch_size=32)
     image_module = MyImageModule(batch_size=32)
@@ -310,9 +310,9 @@ if __name__ == '__main__':
 
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
-    # name_model, inference_model = image_model.inference_model()
-    name_model = 'model-epoch=15-val_loss=0.46.ckpt'
-    inference_model = image_model.load_model(name_model)
+    name_model, inference_model = image_model.inference_model()
+    # name_model = 'model-epoch=15-val_loss=0.46.ckpt'
+    # inference_model = image_model.load_model(name_model)
     print("Inference model:", inference_model)
     print("Name:", name_model)
 
@@ -327,7 +327,7 @@ if __name__ == '__main__':
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='vgg16')
+    metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='resnet50')
     # preds_correct = metrics.get_num_correct()
     # print('total correct:', preds_correct)
     # print('accuracy:', preds_correct / len(image_module.test_data))
