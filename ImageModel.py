@@ -16,7 +16,7 @@ from sklearn.preprocessing import label_binarize
 from PIL import Image
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from ray.tune.integration.pytorch_lightning import TuneReportCallback
+#from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -76,10 +76,10 @@ class ImageModel():
                                             patience=2,
                                             verbose=False,
                                             mode='min')
-        tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
-                                                   "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
+        # tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
+        #                                            "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
 
-        return checkpoint_callback, early_stop_callback, tune_report_callback
+        return checkpoint_callback, early_stop_callback
 
     def call_trainer(self):
         # Load images  ################################################
@@ -96,7 +96,7 @@ class ImageModel():
         self.logger.close()
 
         # Load callbacks ########################################
-        checkpoint_callback, early_stop_callback, tune_report_callback = self.config_callbacks()
+        checkpoint_callback, early_stop_callback = self.config_callbacks()
 
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
