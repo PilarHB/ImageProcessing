@@ -200,10 +200,10 @@ class CNN(pl.LightningModule):
 
         output_feat = self._forward_features(input)
         # print("output_feat")
-        print(output_feat.size())
+        # print(output_feat.size())
         n_size = output_feat.data.view(batch_size, -1).size(1)
         # print("n_size")
-        print(n_size)
+        # print(n_size)
         return n_size
 
     def get_size(self):
