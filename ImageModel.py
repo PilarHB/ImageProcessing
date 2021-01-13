@@ -26,11 +26,11 @@ from MyImageModule import MyImageModule
 torch.set_printoptions(linewidth=120)
 
 
-class ImageModel():
+class ImageModel:
     def __init__(self,
                  model_name,
                  batch_size=8,
-                 num_epochs=30,
+                 num_epochs=20,
                  img_size=256,
                  fine_tuning=True):
         super(ImageModel, self).__init__()
@@ -45,7 +45,7 @@ class ImageModel():
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
-        self.model = CNN()
+        self.model = CNN(backbone=model_name)
         self.model_name = model_name
         # self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
         self.image_module = MyImageModule(batch_size=self.batch_size)
@@ -233,7 +233,7 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel(model_name='resnet50')
+    image_model = ImageModel(model_name='resnet18')
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################

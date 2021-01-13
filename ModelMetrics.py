@@ -37,9 +37,9 @@ from MyImageModule import MyImageModule
 from ImageModel import ImageModel
 
 
-class Model_Metrics():
+class ModelMetrics():
     def __init__(self, preds, targets, name_model, parent_model):
-        super(Model_Metrics, self).__init__()
+        super(ModelMetrics, self).__init__()
         self.preds = preds
         self.targets = targets
         self.parent_model = parent_model
@@ -315,16 +315,16 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel(model_name='resnet50')
+    image_model = ImageModel(model_name='resnet18')
     # Initialize Image Module
     # image_module = MyImageModule(dataset_size=100, batch_size=32)
-    image_module = MyImageModule(batch_size=32)
+    image_module = MyImageModule(batch_size=8)
     image_module.setup()
 
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
     # name_model, inference_model = image_model.inference_model()
-    name_model = 'model-epoch=05-val_loss=0.39.ckpt'
+    name_model = 'model-epoch=07-val_loss=0.40.ckpt'
     inference_model = image_model.load_model(name_model)
     # print("Inference model:", inference_model)
     print("Name:", name_model)
@@ -335,16 +335,16 @@ if __name__ == '__main__':
     # print("y_pred", y_true)
 
     # Predictions with tensors
-    # test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
+    test_preds, test_targets = get_all_preds(inference_model, image_module.test_dataloader())
     # print("Test preds:", test_preds)
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    # metrics = Model_Metrics(test_preds, test_targets, name_model, parent_model='resnet50')
+    metrics = ModelMetrics(test_preds, test_targets, name_model, parent_model='resnet18')
     # preds_correct = metrics.get_num_correct()
     # print('total correct:', preds_correct)
     # print('accuracy:', preds_correct / len(image_module.test_data))
-    # metrics.get_test_metrics(display=True)
+    metrics.get_test_metrics(display=True)
 
     # # Without tensors
     # preds_correct = get_num_correct(torch.Tensor(y_pred), torch.Tensor(y_true))

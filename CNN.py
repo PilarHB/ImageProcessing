@@ -17,9 +17,11 @@ import pytorch_lightning as pl
 import torchvision.models as models
 from typing import Optional
 from torch.optim import lr_scheduler
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
 from pytorch_lightning.metrics.functional import accuracy, auroc, precision, recall, confusion_matrix, f1, fbeta
 import pytorch_lightning.metrics
+
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
 
@@ -56,6 +58,7 @@ def freeze(module: Module,
     for child in children[n_max:]:
         _make_trainable(module=child)
 
+
 def _recursive_freeze(module: Module,
                       train_bn: bool = True) -> None:
     """Freezes the layers of a given module.
@@ -75,6 +78,7 @@ def _recursive_freeze(module: Module,
     else:
         for child in children:
             _recursive_freeze(module=child, train_bn=train_bn)
+
 
 def filter_params(module: Module,
                   train_bn: bool = True) -> Generator:
@@ -116,7 +120,7 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self,
                  input_shape: list = [3, 256, 256],
-                 backbone: str = 'resnet50',
+                 backbone: str = 'resnet18',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  batch_size: int = 8,
@@ -160,10 +164,10 @@ class CNN(pl.LightningModule):
         # self.feature_extractor.eval()
         freeze(module=self.feature_extractor, train_bn=self.train_bn)
         # si queremos descongelar últimas capas
-        freeze(module=self.feature_extractor, n=-1, train_bn=self.train_bn)
+        # freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
         # _unfreeze_and_add_param_group(
         #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
-        # )
+        #     )
 
         # 2. Adaptive layer:
         self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
@@ -280,7 +284,10 @@ class CNN(pl.LightningModule):
     def configure_optimizers(self):
 
         # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
         optimizer1 = torch.optim.SGD(self.parameters(), lr=0.002, momentum=0.9)
+
+        scheduler = MultiStepLR(optimizer, milestones=self.milestones, gamma=self.lr_scheduler_gamma)
         # Decay LR by a factor of 0.1 every 7 epochs
         scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
         # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
