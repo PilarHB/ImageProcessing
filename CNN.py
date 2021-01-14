@@ -152,12 +152,12 @@ class CNN(pl.LightningModule):
         model_func = getattr(models, self.backbone)
         backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
-        print("BEFORE CUT")
-        _layers = list(backbone.children())
-        print(_layers)
-        print("AFTER CUT")
+        # print("BEFORE CUT")
+        # _layers = list(backbone.children())
+        # print(_layers)
+        # print("AFTER CUT")
         _layers = list(backbone.children())[:-1]
-        print(_layers)
+        # print(_layers)
         self.feature_extractor = torch.nn.Sequential(*_layers)
         # print(self.feature_extractor)
         # If.eval() is used, then the layers are frozen.

@@ -29,6 +29,7 @@ torch.set_printoptions(linewidth=120)
 class ImageModel:
     def __init__(self,
                  model_name,
+                 dataset_size=None,
                  batch_size=8,
                  num_epochs=20,
                  img_size=256,
@@ -38,6 +39,7 @@ class ImageModel:
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.img_size = img_size
+        self.dataset_size = dataset_size
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         # layer params
         # self.feature_extract = feature_extract
@@ -48,7 +50,7 @@ class ImageModel:
         self.model = CNN(backbone=model_name)
         self.model_name = model_name
         # self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
-        self.image_module = MyImageModule(batch_size=self.batch_size)
+        self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=self.dataset_size)
         # For getting the features for the image
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
@@ -233,7 +235,7 @@ if __name__ == '__main__':
         # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel(model_name='resnet18')
+    image_model = ImageModel(model_name='vgg16', dataset_size=2692)
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################
