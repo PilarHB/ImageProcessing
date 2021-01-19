@@ -156,7 +156,7 @@ class ImageModel:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         image_tensor = transform(image).unsqueeze(0)
-        print(image_tensor.shape)
+        # print(image_tensor.shape)
         return image_tensor
 
     @torch.no_grad()
@@ -195,7 +195,7 @@ class ImageModel:
     def load_model(self, name):
         # model_ckpts = os.listdir(self.MODEL_CKPT_PATH)
         model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + name)
-        print(model)
+        # print(model)
         return model
 
     # Find the best learning rate
