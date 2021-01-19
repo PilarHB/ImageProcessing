@@ -26,8 +26,6 @@ from torch.utils.data import Dataset, DataLoader, random_split, SubsetRandomSamp
 from pytorch_lightning import Trainer, seed_everything
 
 
-
-
 class MyImageModule(pl.LightningDataModule):
 
     def __init__(self, batch_size, dataset_size=None):
@@ -110,9 +108,9 @@ class MyImageModule(pl.LightningDataModule):
         self.val_data = TransformSubset(val_data, transform=self.transform)
         self.test_data = TransformSubset(test_data, transform=self.transform)
 
-        # print('Targets Train:', TransformSubset(train_data, transform=self.augmentation).count_targets())
-        # print('Targets Val:', TransformSubset(val_data, transform=self.augmentation).count_targets())
-        # print('Targets Test:', TransformSubset(test_data, transform=self.augmentation).count_targets())
+        print('Targets Train:', TransformSubset(self.train_data).count_targets())
+        print('Targets Val:', TransformSubset(self.val_data).count_targets())
+        print('Targets Test:', TransformSubset(self.test_data).count_targets())
 
     def train_dataloader(self):
         train_loader = torch.utils.data.DataLoader(self.train_data, batch_size=self.batch_size)
@@ -145,6 +143,7 @@ class MyImageModule(pl.LightningDataModule):
         print('Count class 0:', class_0)
         print('Count class 1:', class_1)
 
+
 class TransformSubset(Dataset):
     def __init__(self, subset, transform=None):
         self.subset = subset
@@ -160,17 +159,10 @@ class TransformSubset(Dataset):
         return len(self.subset)
 
     def count_targets(self):
-        class_0 = 0
-        class_1 = 0
+        count_class = [0, 0]
         for tensor, target in self.subset:
-            if self.transform:
-                tensor = self.transform(tensor)
-                if target == 0:
-                    class_0 += 1
-                else:
-                    class_1 += 1
-        print('Count class 0:', class_0)
-        print('Count class 1:', class_1)
-        return class_0, class_1
-
-
+            if target == 0:
+                count_class[0] += 1
+            else:
+                count_class[1] += 1
+        return count_class
