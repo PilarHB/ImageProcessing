@@ -56,7 +56,7 @@ class ImageModel:
         # Save the model after every epoch by monitoring a quantity.
         current_path = os.path.dirname(os.path.realpath(__file__))
         self.MODEL_CKPT_PATH = os.path.join(current_path, f'model/{self.model_name}/')
-        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}-weights7y3_unfreeze2')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Tensorboard Logger used
         self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
         self.fine_tuning = fine_tuning
