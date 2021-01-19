@@ -169,8 +169,8 @@ class ImageModel:
     # TODO: Revisar este método, creo que no es necesario
     def evaluate_model(self):
         inference_model = self.inference_model()
-        print("Inference model:", inference_model)
-        print("Test Dataloader:", self.image_module.test_dataloader())
+        # print("Inference model:", inference_model)
+        # print("Test Dataloader:", self.image_module.test_dataloader())
         y_true, y_pred = image_model.evaluate(inference_model, self.image_module.test_dataloader())
         return y_true, y_pred
 
