@@ -162,9 +162,9 @@ class CNN(pl.LightningModule):
         # print(self.feature_extractor)
         # If.eval() is used, then the layers are frozen.
         # self.feature_extractor.eval()
-        freeze(module=self.feature_extractor, train_bn=self.train_bn)
+        # freeze(module=self.feature_extractor, train_bn=self.train_bn)
         # si queremos descongelar últimas capas
-        # freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
+        freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
         # _unfreeze_and_add_param_group(
         #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
         #     )
@@ -227,9 +227,15 @@ class CNN(pl.LightningModule):
         # print("Size last_layer", x.size())
         return x
 
-    # loss function
-    def loss(self, logits, labels):
-        return self.loss_func(input=logits, target=labels)
+    # loss function, weights modified to give more importance to class 1
+    @staticmethod
+    def _loss_function(logits, labels):
+
+        weights = torch.tensor([7.0, 3.0]).cuda()
+        loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
+        # loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
+
+        return loss
 
     # trainning loop
     def training_step(self, batch, batch_idx):
@@ -304,11 +310,10 @@ class CNN(pl.LightningModule):
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
 
     # TODO: Refactor internal metrics
-    @staticmethod
-    def _calculate_step_metrics(logits, y):
+    def _calculate_step_metrics(self, logits, y):
         # prepare the metrics
-        loss = F.cross_entropy(logits[1], y)
-        # train_loss = self.loss(logits[1], y)
+        loss = self._loss_function(logits[1], y)
+        # loss = F.cross_entropy(logits[1], y)
         preds = torch.argmax(logits[1], dim=1)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)

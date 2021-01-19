@@ -26,8 +26,6 @@ from torch.utils.data import Dataset, DataLoader, random_split, SubsetRandomSamp
 from pytorch_lightning import Trainer, seed_everything
 
 
-
-
 class MyImageModule(pl.LightningDataModule):
 
     def __init__(self, batch_size, dataset_size=None):
@@ -145,6 +143,7 @@ class MyImageModule(pl.LightningDataModule):
         print('Count class 0:', class_0)
         print('Count class 1:', class_1)
 
+
 class TransformSubset(Dataset):
     def __init__(self, subset, transform=None):
         self.subset = subset
@@ -162,10 +161,8 @@ class TransformSubset(Dataset):
     def count_targets(self):
         count_class = [0, 0]
         for tensor, target in self.subset:
-                if target == 0:
-                    count_class[0] += 1
-                else:
-                    count_class[1] += 1
+            if target == 0:
+                count_class[0] += 1
+            else:
+                count_class[1] += 1
         return count_class
-
-

@@ -56,7 +56,7 @@ class ImageModel:
         # Save the model after every epoch by monitoring a quantity.
         current_path = os.path.dirname(os.path.realpath(__file__))
         self.MODEL_CKPT_PATH = os.path.join(current_path, f'model/{self.model_name}/')
-        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
+        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}-weights7y3_unfreeze2')
         # Tensorboard Logger used
         self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
         self.fine_tuning = fine_tuning
@@ -230,12 +230,9 @@ if __name__ == '__main__':
     # print("Cuda:", torch.cuda.get_device_name(0))
     if dev.type == 'cuda':
         print(torch.cuda.get_device_name(0))
-        # print('Memory Usage:')
-        # print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-        # print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
     # Config  ################################################
-    image_model = ImageModel(model_name='vgg16', dataset_size=2692)
+    image_model = ImageModel(model_name='resnet50', dataset_size=2692)
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################

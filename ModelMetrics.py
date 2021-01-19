@@ -45,6 +45,7 @@ class ModelMetrics():
         self.parent_model = parent_model
         self.name_model = name_model
         current_path = os.path.dirname(os.path.realpath(__file__))
+        # define directory for the metrics file
         self.CSV_PATH = os.path.join(current_path,
                                      f'models_metrics/{self.parent_model}/%s_metrics/%s_metrics.csv' % (
                                      self.name_model, self.name_model))
@@ -52,13 +53,13 @@ class ModelMetrics():
                                                  f'models_metrics/{self.parent_model}/%s_metrics' % self.name_model)
         # define the directory for the images
         pathlib.Path(self.METRICS_FIGURES_PATH).mkdir(parents=True, exist_ok=True)
+        # define the directory for the plots
         self.ROC_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'ROC_Curve.png')
         self.Precision_Recall_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'Precision_Recall_Curve.png')
         self.CM_PATH = os.path.join(self.METRICS_FIGURES_PATH, 'Confusion_Matrix.png')
 
     # --- PLOTS ----
     # Plot ROC Curve
-    # TODO: Implementar curva ROC
     def plot_ROC_curve(self, pos_label):
         # Compute ROC curve and ROC area for each class
         y_true = self.targets.detach().numpy()
@@ -112,7 +113,6 @@ class ModelMetrics():
         plt.close()
 
     # Plot Precision-Recall Curve
-    # TODO: Arreglar la representación de la curva
     def plot_precision_recall_curve(self, recall, precision):
         plt.figure()
         plt.plot(recall, precision, color='r', alpha=0.99)
@@ -126,10 +126,11 @@ class ModelMetrics():
         plt.savefig(self.Precision_Recall_PATH, format='png')
         plt.close()
 
+    # Get number of predictions correct
     def get_num_correct(self):
         return self.preds.argmax(dim=1).eq(self.targets).sum().item()
 
-    # TODO: Precision_recall_curve and plot
+    # Get Precision_recall_curve and plot
     def get_precision_recall_curve(self, pos_label=1, display=True):
         precision, recall, _ = precision_recall_curve(torch.tensor(self.preds.argmax(dim=1)),
                                                       torch.tensor(self.targets),
@@ -138,22 +139,22 @@ class ModelMetrics():
             self.plot_precision_recall_curve(recall, precision)
         return precision, recall
 
-    # TODO: ROC Metric and ROC Curve
+    # ROC Metric and ROC Curve
     def get_ROC_curve(self, pos_label=1):
         roc_auc = self.plot_ROC_curve(pos_label)
         return roc_auc
 
-    # TODO: Stats_score
+    # Get Stats_score
     def get_stats_score(self, class_index=1):
         tp, fp, tn, fn, sup = stat_scores(self.preds, self.targets, class_index)
         return tp, fp, tn, fn, sup
 
-    # TODO: F1 Score
+    # F1 Score
     def get_f1_score(self):
         f1_score = f1(self.preds, self.targets, num_classes=2, average='none')
         return f1_score
 
-    # TODO: Confusion matrix and plot
+    # Confusion matrix and plot
     def get_confusion_matrix(self, display=True):
         cm = confusion_matrix(self.preds.argmax(dim=1), self.targets, num_classes=2)
         classes = find_classes(dir='./images/')
@@ -161,7 +162,7 @@ class ModelMetrics():
             self.plot_confusion_matrix(cm.int(), classes)
         return cm.int()
 
-    # TODO: Finish test metrics
+    # Get and display all the metrics. The metrics are saved in a file
     def get_test_metrics(self, display=True):
         # Get Precision - Recall
         output = precision_recall(self.preds, self.targets, num_classes=2, class_reduction='none')
@@ -194,7 +195,7 @@ class ModelMetrics():
         print("Classification Report")
         print(report)
 
-        # TODO: Save variables in file
+        # Variables are saved in a file
         # List of metric, value for class 0, value for class 1
         metric = ['Precision', 'Recall', 'F1 Score', 'F0.5 Score', 'F2_Score', 'TP', 'FP', 'TN', 'FN', 'ROC']
         value_class0 = [precision[0], recall[0], f1_score[0].numpy(), f05_score[0].numpy(), f2_score[0].numpy(), tp_0,
@@ -315,7 +316,7 @@ def show_activations(model):
 # --MAIN ------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # instantiate class to handle model
-    image_model = ImageModel(model_name='vgg16', dataset_size=2692)
+    image_model = ImageModel(model_name='resnet50', dataset_size=2692)
     # Initialize Image Module
     # image_module = MyImageModule(dataset_size=100, batch_size=32)
     image_module = MyImageModule(dataset_size=2692, batch_size=8)
@@ -324,7 +325,7 @@ if __name__ == '__main__':
     # --- PREDICT RESULTS ---
     # Get name and model used for testing
     # name_model, inference_model = image_model.inference_model()
-    name_model = 'model-epoch=14-val_loss=0.52.ckpt'
+    name_model = 'model-epoch=05-val_loss=0.36-weights7y3_unfreeze2.ckpt'
     inference_model = image_model.load_model(name_model)
     # print("Inference model:", inference_model)
     print("Name:", name_model)
@@ -340,7 +341,7 @@ if __name__ == '__main__':
     # print("Test_targets", test_targets)
 
     # --- TESTING METRICS ---
-    metrics = ModelMetrics(test_preds, test_targets, name_model, parent_model='vgg16')
+    metrics = ModelMetrics(test_preds, test_targets, name_model, parent_model='resnet50')
     # preds_correct = metrics.get_num_correct()
     # print('total correct:', preds_correct)
     # print('accuracy:', preds_correct / len(image_module.test_data))
