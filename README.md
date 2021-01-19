@@ -3,9 +3,15 @@ Image Preprocessing and Image Processing for Image Recognition.
 
 ImageProcessing is a repository for Image Recognition. The objective of the code is to train a model capable 
 of classifying the input images as 'success' or 'fail'. The output of the model will be a tensor of features and the
-result of classification. 
+result of classification.
+
 
 ## Definition of the problem
+
+Our input is a labeled image dataset. Our images are classified with 'success' or 'fail'. The goal is to train a
+Deep Learning model, with the best performance possible. The feature extraction will be finetuned
+so we can extract the features of the images fed them into a Reinforcement Learning algorithm with the result of the
+classification. 
 
 ## Elements in the code
 This codes uses Pytorch Lightning, Python 3.7 and Tensorboard. 
@@ -18,7 +24,7 @@ This codes uses Pytorch Lightning, Python 3.7 and Tensorboard.
 
 ## Model
 
-- Class ImageModel import the desired model, as a default the CNN model with transfer learning. The ImageModel class is
+Class **ImageModel** import the desired model, as a default the CNN model with transfer learning. The ImageModel class is
 prepared to train, test, load models and perform predictions. Also, this class calls MyImageModule in charge of loading the
 image dataset. 
 
