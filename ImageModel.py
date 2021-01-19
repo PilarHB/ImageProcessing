@@ -144,7 +144,7 @@ class ImageModel:
         features, pred = model(image_tensor)
         # print("Features", self.activation['classifier[6]'])
         # features_size = output[0].shape
-        return features.detach().numpy()
+        return features.detach().numpy(), pred
 
     def image_preprocessing(self, image):
         transform = transforms.Compose([
