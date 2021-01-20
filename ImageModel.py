@@ -154,7 +154,7 @@ class ImageModel:
         image_tensor = transform(image).float()
         # image = Variable(image_tensor, requires_grad=True)
         image = image_tensor.unsqueeze(0)
-        print(image.shape)
+        # print(image.shape)
         return image
 
     @torch.no_grad()
