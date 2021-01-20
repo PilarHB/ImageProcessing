@@ -247,7 +247,10 @@ def get_all_preds(model, loader):
             preds = model(images)
             all_preds = torch.cat((all_preds, preds[1]), dim=0)
             all_targets = torch.cat((all_targets, labels), dim=0)
+    print(torch.exp(all_preds))
     return all_preds, all_targets
+
+# def get_single_pred()
 
 
 def find_classes(dir):
@@ -319,7 +322,7 @@ if __name__ == '__main__':
     image_model = ImageModel(model_name='resnet50', dataset_size=2692)
     # Initialize Image Module
     # image_module = MyImageModule(dataset_size=100, batch_size=32)
-    image_module = MyImageModule(dataset_size=2692, batch_size=8)
+    image_module = MyImageModule(dataset_size=2692, batch_size=1)
     image_module.setup()
 
     # --- PREDICT RESULTS ---
@@ -368,5 +371,7 @@ if __name__ == '__main__':
     #     add_pr_curve_tensorboard(image_model.writer, i, test_probs, class_names, test_preds)
 
     # show_activations(inference_model)
+
+
 
 

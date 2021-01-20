@@ -7,18 +7,14 @@ import re
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import torchvision
-import torchvision.transforms.functional as F
-from pytorch_lightning import seed_everything, metrics
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from pytorch_lightning.metrics.functional import precision_recall_curve, auc
-from sklearn.metrics import roc_curve
-from sklearn.preprocessing import label_binarize
 from PIL import Image
-from torchvision import transforms
+from pytorch_lightning import seed_everything
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torchvision import transforms, datasets
 from pytorch_lightning.loggers import TensorBoardLogger
-#from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from torch.utils.tensorboard import SummaryWriter
-
+# from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 from CNN import CNN
 from MyImageModule import MyImageModule
@@ -40,10 +36,6 @@ class ImageModel:
         self.num_epochs = num_epochs
         self.img_size = img_size
         self.dataset_size = dataset_size
-        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
-        # layer params
-        # self.feature_extract = feature_extract
-        # criterion = nn.CrossEntropyLoss()
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
@@ -59,8 +51,8 @@ class ImageModel:
         self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
         # Tensorboard Logger used
         self.logger = TensorBoardLogger('tb_logs', name=f'Model_{self.model_name}')
+        # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
-
 
     def config_callbacks(self):
         # Checkpoint  ################################################
@@ -133,31 +125,37 @@ class ImageModel:
 
     # Returns the size of features tensor
     def get_size_features(self, model):
-
         feature_size = model.get_size()
         return feature_size
 
-    @torch.no_grad()
+    # @torch.no_grad()
+    # def evaluate_image(self, image, model):
+    #     image_tensor = self.image_preprocessing(image)
+    #     # model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
+    #     features, pred = model(image_tensor)
+    #     # print("Features", self.activation['classifier[6]'])
+    #     # features_size = output[0].shape
+    #     return features.detach().numpy(), pred.detach().numpy()
+
     def evaluate_image(self, image, model):
         image_tensor = self.image_preprocessing(image)
-        # model.feature_extractor.classifier[6].register_forward_hook(self.get_activation('classifier[6]'))
-        features, pred = model(image_tensor)
-        # print("Features", self.activation['classifier[6]'])
-        # features_size = output[0].shape
-        return features.detach().numpy(), pred
+        features, prediction = model(image_tensor)
+        return features.detach().numpy(), prediction.detach()
 
     def image_preprocessing(self, image):
         transform = transforms.Compose([
             # you can add other transformations in this list
             # transforms.Grayscale(num_output_channels=1),
-            transforms.Resize(size=256),
             transforms.CenterCrop(size=224),
+            transforms.Resize(size=256),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        image_tensor = transform(image).unsqueeze(0)
-        # print(image_tensor.shape)
-        return image_tensor
+        image_tensor = transform(image).float()
+        # image = Variable(image_tensor, requires_grad=True)
+        image = image_tensor.unsqueeze(0)
+        print(image.shape)
+        return image
 
     @torch.no_grad()
     def inference_model(self):
@@ -166,7 +164,7 @@ class ImageModel:
         inference_model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + best_model)
         return best_model, inference_model
 
-    # TODO: Revisar este método, creo que no es necesario
+    # Evaluate the model with the test data_loader
     def evaluate_model(self):
         inference_model = self.inference_model()
         # print("Inference model:", inference_model)
@@ -195,6 +193,7 @@ class ImageModel:
     def load_model(self, name):
         # model_ckpts = os.listdir(self.MODEL_CKPT_PATH)
         model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + name)
+        model.freeze()
         # print(model)
         return model
 
@@ -221,6 +220,31 @@ class ImageModel:
         self.find_lr(trainer)
         self.find_optimal_batch_size(trainer)
 
+    @torch.no_grad()
+    def get_all_preds(self, model, loader):
+        self.setup_data()
+        with torch.no_grad():
+            all_preds = torch.tensor([])
+            all_targets = torch.tensor([])
+            for batch in loader:
+                images, labels = batch
+                preds = model(images)
+                all_preds = torch.cat((all_preds, preds[1]), dim=0)
+                all_targets = torch.cat((all_targets, labels), dim=0)
+        return torch.exp(all_preds), all_targets
+
+    def setup_data(self):
+        self.image_module.setup()
+
+
+    def test_predictions(self, model):
+        dataset = datasets.ImageFolder('pruebas_salida')
+        dataloader = DataLoader(dataset, batch_size=1,
+                                shuffle=True, num_workers=0)
+        test_loader = self.image_module.test_dataloader()
+        test_preds, test_targets = self.get_all_preds(model, test_loader)
+        print(test_preds)
+
 
 # --- MAIN ----
 if __name__ == '__main__':
@@ -236,19 +260,35 @@ if __name__ == '__main__':
     # checkpoint_callback, early_stop_callback = image_model.config_callbacks()
 
     # Train model  ################################################
-    image_model.call_trainer()
+    # image_model.call_trainer()
     # y_true, y_pred = evaluate(model, image_module.test_dataloader())
 
-    # Load best model  ################################################
-    # best_model = image_model.load_best_model()
-    # print("Best model:", best_model)
-    # inference_model = image_model.inference_model()
-    # print(inference_model)
+    # Load model  ################################################
+    name_model = 'model-epoch=05-val_loss=0.36-weights7y3_unfreeze2.ckpt'
+    inference_model = image_model.load_model(name_model)
 
     #  Evaluate output  ################################################
-    # image = Image.open("./images/fail/img1605601451.8657722.png")
-    # image_tensor = image_model.image_preprocessing(image)
-    # image_model.evaluate_image(image, inference_model)
+    image_sinfichas = Image.open("pruebas_salida/img1611066111.526423.png")
+    # image_confichas = Image.open("pruebas_salida/img1611066172.4361975.png")
+    image_success = Image.open("images/success/img1607942892.174248.png")
+
+    # image_model.setup_data()
+    # preds, targets = image_model.get_all_preds(inference_model, image_model.image_module.test_dataloader())
+    # print(preds)
+
+    image_tensor = image_model.image_preprocessing(image_success)
+    features, preds = image_model.evaluate_image(image_success, inference_model)
+    print(torch.exp(preds))
+
+
+    # features, pred_sinfichas = image_model.evaluate_image(image_sinfichas, inference_model)
+    # features, pred_confichas = image_model.evaluate_image(image_confichas, inference_model)
+    # features, pred_success = image_model.evaluate_image(image_success, inference_model)
+    # print("Sin fichas:", torch.exp(pred_sinfichas))
+    # print("Con fichas:",  torch.exp(pred_confichas))
+    # print("Success:",  torch.exp(pred_success))
+
+    # image_model.test_predictions(inference_model)
 
     # feature_size = image_model.get_size_features(inference_model)
     # print(feature_size)
@@ -256,6 +296,4 @@ if __name__ == '__main__':
     # Evaluate model  ################################################
     # inference_model = image_model.inference_model()
     # y_true, y_pred = image_model.evaluate_model()
-
-
 

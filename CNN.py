@@ -202,6 +202,7 @@ class CNN(pl.LightningModule):
         t = self.fc(features)
         # We want the probability to sum 1
         t = F.log_softmax(t, dim=1)
+
         return features, t
 
     # returns the size of the output tensor going into the Linear layer from the conv block.
