@@ -16,8 +16,8 @@ from torchvision import transforms, datasets
 from pytorch_lightning.loggers import TensorBoardLogger
 # from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from CNN import CNN
-from MyImageModule import MyImageModule
+from .CNN import CNN
+from .MyImageModule import MyImageModule
 
 torch.set_printoptions(linewidth=120)
 
